@@ -1,4 +1,4 @@
-const Student = require('../models/Student');
+const Student = require("../models/Student");
 
 exports.getStudents = async (req, res) => {
   try {
@@ -22,7 +22,7 @@ exports.createStudent = async (req, res) => {
 exports.getStudentById = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
+    if (!student) return res.status(404).json({ message: "Student not found" });
     res.json(student);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -32,7 +32,7 @@ exports.getStudentById = async (req, res) => {
 exports.getStudentByEmail = async (req, res) => {
   try {
     const student = await Student.findOne({ email: req.params.email });
-    if (!student) return res.status(404).json({ message: 'Student not found' });
+    if (!student) return res.status(404).json({ message: "Student not found" });
     res.json(student);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -42,9 +42,22 @@ exports.getStudentByEmail = async (req, res) => {
 exports.getStudentByUserId = async (req, res) => {
   try {
     const student = await Student.findOne({ user_id: req.params.userId });
-    if (!student) return res.status(404).json({ message: 'Student not found' });
+    if (!student) return res.status(404).json({ message: "Student not found" });
     res.json(student);
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+exports.updateStudent = async (req, res) => {
+  try {
+    const student = await Student.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.json(student);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
   }
 };
