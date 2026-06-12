@@ -22,7 +22,13 @@ const paymentController = require("./controllers/paymentController");
 const followController = require("./controllers/followController");
 const postController = require("./controllers/postController");
 const adminController = require("./controllers/adminController");
+
+const pathwayController = require("./controllers/pathwayController");
+const mcqAttemptController      = require("./controllers/mcqAttemptController");
+const activityAttemptController = require("./controllers/activityAttemptController");
+
 const aiController = require("./controllers/aiController");
+
 
 // Routes
 // AI routes (math canvas)
@@ -123,7 +129,7 @@ router.get("/api/course-contents", courseContentController.getCourseContents);
 router.post(
   "/api/course-contents",
   authenticate,
-  adminOnly,
+  teacherOnly,
   courseContentController.createCourseContent,
 );
 router.get(
@@ -138,14 +144,14 @@ router.get(
 router.put(
   "/api/course-contents/:id",
   authenticate,
-  adminOnly,
+  teacherOnly,
   courseContentController.updateCourseContent,
 );
 
 router.delete(
   "/api/course-contents/:id",
   authenticate,
-  adminOnly,
+  teacherOnly,
   courseContentController.deleteCourseContent,
 );
 
@@ -422,6 +428,45 @@ router.delete(
   authenticate,
   adminOnly,
   adminController.deleteUser,
+);
+
+// Pathway routes
+router.get("/api/pathways", pathwayController.getPathways);
+router.get("/api/pathways/published", pathwayController.getPublishedPathways);
+router.get("/api/pathways/:id", pathwayController.getPathwayById);
+router.post("/api/pathways", authenticate, adminOnly, pathwayController.createPathway);
+router.put("/api/pathways/:id", authenticate, adminOnly, pathwayController.updatePathway);
+router.delete("/api/pathways/:id", authenticate, adminOnly, pathwayController.deletePathway);
+
+// MCQ Attempt routes
+router.post("/api/mcq-attempts", authenticate, mcqAttemptController.submitAttempt);
+router.get(
+  "/api/mcq-attempts/questions/:userId/:contentId",
+  authenticate,
+  mcqAttemptController.getQuizQuestions,
+);
+router.get(
+  "/api/mcq-attempts/user/:userId/course/:courseId",
+  authenticate,
+  mcqAttemptController.getAttemptsByUserAndCourse,
+);
+router.get(
+  "/api/mcq-attempts/user/:userId/content/:contentId",
+  authenticate,
+  mcqAttemptController.getAttemptsByUserAndContent,
+);
+
+// Activity Attempt routes
+router.post("/api/activity-attempts", authenticate, activityAttemptController.submitAttempt);
+router.get(
+  "/api/activity-attempts/user/:userId/course/:courseId",
+  authenticate,
+  activityAttemptController.getAttemptsByUserAndCourse,
+);
+router.get(
+  "/api/activity-attempts/user/:userId/content/:contentId",
+  authenticate,
+  activityAttemptController.getAttemptsByUserAndContent,
 );
 
 router.use("/api/meetings", require("./meetings"));
