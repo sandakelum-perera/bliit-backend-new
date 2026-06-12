@@ -8,7 +8,8 @@ exports.getCourses = async (req, res) => {
       .populate({
         path: "instructor_id",
         populate: { path: "user_id" },
-      });
+      })
+      .populate("pathway_id", "name");
     if (courses.length === 0) {
       return res.json({ message: "No courses available" });
     }
@@ -35,7 +36,8 @@ exports.getCourseById = async (req, res) => {
       .populate({
         path: "instructor_id",
         populate: { path: "user_id" },
-      });
+      })
+      .populate("pathway_id", "name description");
     if (!course) return res.status(404).json({ message: "Course not found" });
     res.json(course);
   } catch (err) {
