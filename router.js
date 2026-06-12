@@ -22,15 +22,25 @@ const paymentController = require("./controllers/paymentController");
 const followController = require("./controllers/followController");
 const postController = require("./controllers/postController");
 const adminController = require("./controllers/adminController");
+<<<<<<< HEAD
 const pathwayController = require("./controllers/pathwayController");
 const mcqAttemptController      = require("./controllers/mcqAttemptController");
 const activityAttemptController = require("./controllers/activityAttemptController");
+=======
+const aiController = require("./controllers/aiController");
+>>>>>>> 270a0c258d6e4eed267c0adcee5e15cbd9d009a5
 
 // Routes
+// AI routes (math canvas)
+router.post("/api/ai/generate-question", authenticate, aiController.generateQuestion);
+router.post("/api/ai/solve-math", authenticate, aiController.solveMath);
+router.post("/api/ai/check-answer", authenticate, aiController.checkAnswer);
+
 // Authentication routes
 router.post("/api/users/login", userController.login);
 router.post("/api/users/register", userController.register);
 router.post("/api/users/google-auth", userController.googleAuth);
+router.get("/api/users/me", authenticate, userController.getMe);
 
 // User routes
 router.get("/api/users", authenticate, adminOnly, userController.getUsers);
