@@ -1,4 +1,8 @@
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+
+const JWT_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 // Authentication middleware - verifies user is logged in
 const authenticate = async (req, res, next) => {
@@ -10,7 +14,7 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    // If userId is provided, fetch user
+    // If userId is provided, fetch user directly
     if (userId) {
       const user = await User.findById(userId);
       if (!user) {
@@ -20,12 +24,21 @@ const authenticate = async (req, res, next) => {
       return next();
     }
 
-    // If using Bearer token
+    // Verify Bearer JWT token
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
-      // Add JWT verification here if you implement JWT tokens
-      // For now, we'll rely on x-user-id header
-      return res.status(401).json({ message: "Invalid token format" });
+      let decoded;
+      try {
+        decoded = jwt.verify(token, JWT_SECRET);
+      } catch (jwtErr) {
+        return res.status(401).json({ message: "Invalid or expired token" });
+      }
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+      req.user = user;
+      return next();
     }
 
     return res.status(401).json({ message: "Authentication required" });

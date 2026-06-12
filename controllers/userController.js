@@ -12,6 +12,12 @@ const generateToken = (userId) => {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
 };
 
+// Return the currently authenticated user (used by math canvas SSO)
+exports.getMe = (req, res) => {
+  const { _id, name, email, profile_image, role } = req.user;
+  res.json({ _id, name, email, profile_image, role });
+};
+
 exports.getUsers = async (req, res) => {
   try {
     const users = await User.find();
