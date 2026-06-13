@@ -1,6 +1,7 @@
 const Enrollment = require("../models/Enrollment");
 const Student = require("../models/Student");
 const Course = require("../models/Course");
+const Batch = require("../models/Batch");
 
 exports.getEnrollments = async (req, res) => {
   try {
@@ -18,25 +19,34 @@ exports.createEnrollment = async (req, res) => {
   try {
     const { student_id, course_id, user_id, payment_status } = req.body;
 
-    // Check if already enrolled
-    const existingEnrollment = await Enrollment.findOne({
-      student_id,
-      course_id,
-    });
-    if (existingEnrollment) {
-      return res
-        .status(400)
-        .json({ message: "Already enrolled in this course" });
-    }
-
     // Check if the course is free
     const course = await Course.findById(course_id);
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
 
+    // Always link to the active batch for this course
+    const activeBatch = await Batch.findOne({ course_id, status: "active" });
+    if (!activeBatch) {
+      return res.status(400).json({ message: "No active batch available for this course. Enrollment is currently closed." });
+    }
+    const batchId = activeBatch._id;
+
+    // Check if already enrolled in this specific batch
+    const existingEnrollment = await Enrollment.findOne({
+      student_id,
+      course_id,
+      batch_id: batchId || null,
+    });
+    if (existingEnrollment) {
+      return res
+        .status(400)
+        .json({ message: "Already enrolled in the active batch for this course" });
+    }
+
     // If course is free, automatically set payment_status to "paid" and status to "active"
     const enrollmentData = { ...req.body };
+    if (batchId) enrollmentData.batch_id = batchId;
     if (course.isFree) {
       enrollmentData.payment_status = "paid";
       enrollmentData.status = "active";
@@ -101,7 +111,8 @@ exports.getEnrollmentsByUser = async (req, res) => {
           },
         },
       })
-      .populate("student_id");
+      .populate("student_id")
+      .populate("batch_id", "batchName batchCode startDate endDate status");
     res.json(enrollments);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -115,6 +126,20 @@ exports.getEnrollmentsByCourse = async (req, res) => {
     })
       .populate("student_id")
       .populate("user_id");
+    res.json(enrollments);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getEnrollmentsByBatch = async (req, res) => {
+  try {
+    const enrollments = await Enrollment.find({
+      batch_id: req.params.batchId,
+    })
+      .populate("student_id")
+      .populate("user_id")
+      .populate("course_id", "courseName courseCode");
     res.json(enrollments);
   } catch (err) {
     res.status(500).json({ message: err.message });

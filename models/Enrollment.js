@@ -31,11 +31,12 @@ const enrollmentSchema = new mongoose.Schema({
   },
   payment_date: Date,
   payment_id: String,
+  batch_id: { type: mongoose.Schema.Types.ObjectId, ref: "Batch" },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
 
-// Prevent duplicate enrollments
-enrollmentSchema.index({ student_id: 1, course_id: 1 }, { unique: true });
+// One enrollment per student per batch (or per course when no batch)
+enrollmentSchema.index({ student_id: 1, course_id: 1, batch_id: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Enrollment", enrollmentSchema);

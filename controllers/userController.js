@@ -12,6 +12,11 @@ const generateToken = (userId) => {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
 };
 
+// E.164: +<country_code><number>, 8–15 chars total
+const isValidPhone = (phone) => /^\+[1-9]\d{6,14}$/.test(phone);
+
+const phoneInvalid = (phone) => !phone || !isValidPhone(phone);
+
 // Return the currently authenticated user (used by math canvas SSO)
 exports.getMe = (req, res) => {
   const { _id, name, email, profile_image, role } = req.user;
@@ -78,14 +83,45 @@ exports.login = async (req, res) => {
 
     res.json({
       token,
+      requiresPhone: phoneInvalid(user.phone_number),
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         profile_image: user.profile_image,
         role: user.role,
+        phone_number: user.phone_number,
       },
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Update phone number
+exports.updatePhone = async (req, res) => {
+  try {
+    const { phone_number } = req.body;
+    if (phoneInvalid(phone_number)) {
+      return res.status(400).json({ message: "Phone number must include country code (e.g. +94771234567)" });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { phone_number },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Also update student/teacher record
+    if (user.role === "student") {
+      const Student = require("../models/Student");
+      await Student.findOneAndUpdate({ user_id: user._id }, { phone_number });
+    } else if (user.role === "teacher") {
+      const Teacher = require("../models/Teacher");
+      await Teacher.findOneAndUpdate({ user_id: user._id }, { phone_number });
+    }
+
+    res.json({ message: "Phone number updated", user });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -94,7 +130,11 @@ exports.login = async (req, res) => {
 // Register new user
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone_number } = req.body;
+
+    if (phoneInvalid(phone_number)) {
+      return res.status(400).json({ message: "Phone number must include country code (e.g. +94771234567)" });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -111,6 +151,7 @@ exports.register = async (req, res) => {
       email,
       password: hashedPassword,
       role: role || "student",
+      phone_number,
     });
 
     const newUser = await user.save();
@@ -122,6 +163,7 @@ exports.register = async (req, res) => {
         user_id: newUser._id,
         name: newUser.name,
         email: newUser.email,
+        phone_number,
       });
       await student.save();
     } else if (newUser.role === "teacher") {
@@ -130,6 +172,7 @@ exports.register = async (req, res) => {
         user_id: newUser._id,
         name: newUser.name,
         email: newUser.email,
+        phone_number,
       });
       await teacher.save();
     }
@@ -237,12 +280,14 @@ exports.googleAuth = async (req, res) => {
     res.json({
       token,
       isNewUser,
+      requiresPhone: phoneInvalid(user.phone_number),
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         profile_image: user.profile_image,
         role: user.role,
+        phone_number: user.phone_number,
       },
     });
   } catch (err) {

@@ -4,6 +4,21 @@ const Teacher = require("../models/Teacher");
 const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
 const CourseContent = require("../models/CourseContent");
+const Batch = require("../models/Batch");
+
+// Assign active batch to any enrollments that are missing one
+async function patchMissingBatches() {
+  try {
+    const unassigned = await Enrollment.find({ batch_id: { $exists: false } });
+    for (const enrollment of unassigned) {
+      const activeBatch = await Batch.findOne({ course_id: enrollment.course_id, status: "active" });
+      if (activeBatch) {
+        enrollment.batch_id = activeBatch._id;
+        await enrollment.save();
+      }
+    }
+  } catch (_) { /* non-critical background fix */ }
+}
 
 // Get all users with pagination and filters
 exports.getAllUsers = async (req, res) => {
@@ -56,6 +71,7 @@ exports.getEnrollmentStats = async (req, res) => {
 
 // Get all enrollments with detailed information
 exports.getAllEnrollments = async (req, res) => {
+  patchMissingBatches();
   try {
     const { page = 1, limit = 20, payment_status, course_id } = req.query;
     const query = {};
@@ -74,6 +90,7 @@ exports.getAllEnrollments = async (req, res) => {
       })
       .populate("course_id")
       .populate("user_id")
+      .populate("batch_id", "batchName batchCode status")
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ enrollment_date: -1 });
@@ -93,6 +110,7 @@ exports.getAllEnrollments = async (req, res) => {
 
 // Get paid enrollments
 exports.getPaidEnrollments = async (req, res) => {
+  patchMissingBatches();
   try {
     const { page = 1, limit = 20 } = req.query;
 
@@ -103,6 +121,7 @@ exports.getPaidEnrollments = async (req, res) => {
       })
       .populate("course_id")
       .populate("user_id")
+      .populate("batch_id", "batchName batchCode status")
       .limit(limit * 1)
       .skip((page - 1) * limit)
       .sort({ enrollment_date: -1 });

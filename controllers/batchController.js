@@ -57,3 +57,13 @@ exports.getBatchesByCourse = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+exports.getActiveBatchByCourse = async (req, res) => {
+  try {
+    const batch = await Batch.findOne({ course_id: req.params.courseId, status: 'active' }).populate('course_id');
+    if (!batch) return res.status(404).json({ message: 'No active batch found for this course' });
+    res.json(batch);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

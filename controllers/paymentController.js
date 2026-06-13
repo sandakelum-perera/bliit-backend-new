@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const Enrollment = require("../models/Enrollment");
 const Course = require("../models/Course");
 const Student = require("../models/Student");
+const Batch = require("../models/Batch");
 
 // PayHere merchant credentials (replace with your actual credentials)
 const MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || "1227569";
@@ -116,11 +117,12 @@ exports.verifyPayment = async (req, res) => {
           courseId,
         );
 
-        // Find or create enrollment
+        // Find the pending enrollment (most recent unpaid one for this course)
         let enrollment = await Enrollment.findOne({
           user_id: userId,
           course_id: courseId,
-        });
+          payment_status: { $ne: "paid" },
+        }).sort({ enrollment_date: -1 });
 
         if (enrollment) {
           console.log("Found existing enrollment:", enrollment._id);
@@ -143,6 +145,7 @@ exports.verifyPayment = async (req, res) => {
           // Create new enrollment if it doesn't exist
           // Get student_id from user_id
           const student = await Student.findOne({ user_id: userId });
+          const activeBatch = await Batch.findOne({ course_id: courseId, status: "active" });
 
           if (student) {
             console.log("Found student:", student._id);
@@ -150,6 +153,7 @@ exports.verifyPayment = async (req, res) => {
               student_id: student._id,
               user_id: userId,
               course_id: courseId,
+              batch_id: activeBatch ? activeBatch._id : undefined,
               status: "active",
               payment_status: "paid",
               payment_date: new Date(),
@@ -188,19 +192,27 @@ exports.createPaymentPendingEnrollment = async (req, res) => {
   try {
     const { student_id, user_id, course_id } = req.body;
 
-    // Check if already enrolled
+    // Find the active batch for this course
+    const activeBatch = await Batch.findOne({ course_id, status: 'active' });
+    if (!activeBatch) {
+      return res.status(400).json({ message: "No active batch available for this course. Enrollment is currently closed." });
+    }
+    const batchId = activeBatch._id;
+
+    // Check if already enrolled in THIS specific batch
     const existingEnrollment = await Enrollment.findOne({
       user_id,
       course_id,
+      batch_id: batchId,
     });
 
     if (existingEnrollment && existingEnrollment.payment_status === "paid") {
       return res
         .status(400)
-        .json({ message: "Already enrolled in this course" });
+        .json({ message: "Already enrolled in the current batch" });
     }
 
-    // Create or update enrollment
+    // Create or reuse pending enrollment for this batch
     let enrollment;
     if (existingEnrollment) {
       enrollment = existingEnrollment;
@@ -209,6 +221,7 @@ exports.createPaymentPendingEnrollment = async (req, res) => {
         student_id,
         user_id,
         course_id,
+        batch_id: batchId,
         status: "pending",
         payment_status: "pending",
         progress: 0,
@@ -287,11 +300,12 @@ exports.confirmPayment = async (req, res) => {
       return res.status(400).json({ message: "Invalid order ID format" });
     }
 
-    // Find enrollment
+    // Find the most recent pending enrollment for this course
     let enrollment = await Enrollment.findOne({
       user_id: userId,
       course_id: courseId,
-    });
+      payment_status: { $ne: "paid" },
+    }).sort({ enrollment_date: -1 });
 
     if (!enrollment) {
       return res.status(404).json({ message: "Enrollment not found" });

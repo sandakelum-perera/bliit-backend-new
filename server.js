@@ -65,8 +65,14 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => {
+  .then(async () => {
     console.log("[Server] MongoDB connected successfully");
+    try {
+      await mongoose.connection.collection("enrollments").dropIndex("student_id_1_course_id_1");
+      console.log("[Server] Migrated enrollment index to (student_id, course_id, batch_id)");
+    } catch (_) {
+      // Already dropped or never existed — safe to ignore
+    }
   })
   .catch((err) => {
     console.error("[Server] MongoDB connection error:", err.message);

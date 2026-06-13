@@ -26,12 +26,17 @@ const adminController = require("./controllers/adminController");
 const pathwayController = require("./controllers/pathwayController");
 const mcqAttemptController      = require("./controllers/mcqAttemptController");
 const activityAttemptController = require("./controllers/activityAttemptController");
-
+const classResultController = require("./controllers/classResultController");
 
 const aiController = require("./controllers/aiController");
+const { uploadVideo, signVideo } = require("./controllers/uploadController");
 
 
 // Routes
+// Upload routes
+router.post("/api/upload/video", authenticate, teacherOnly, ...uploadVideo);
+router.get("/api/stream/video", authenticate, signVideo);
+
 // AI routes (math canvas)
 router.post("/api/ai/generate-question", authenticate, aiController.generateQuestion);
 router.post("/api/ai/solve-math", authenticate, aiController.solveMath);
@@ -41,6 +46,7 @@ router.post("/api/ai/check-answer", authenticate, aiController.checkAnswer);
 router.post("/api/users/login", userController.login);
 router.post("/api/users/register", userController.register);
 router.post("/api/users/google-auth", userController.googleAuth);
+router.patch("/api/users/:id/phone", userController.updatePhone);
 router.get("/api/users/me", authenticate, userController.getMe);
 
 // User routes
@@ -183,6 +189,9 @@ router.post(
   adminOnly,
   batchController.createBatch,
 );
+// Specific routes before /:id
+router.get("/api/batches/course/:courseId/active", batchController.getActiveBatchByCourse);
+router.get("/api/batches/course/:courseId", batchController.getBatchesByCourse);
 router.get("/api/batches/:id", batchController.getBatchById);
 router.put(
   "/api/batches/:id",
@@ -196,7 +205,6 @@ router.delete(
   adminOnly,
   batchController.deleteBatch,
 );
-router.get("/api/batches/course/:courseId", batchController.getBatchesByCourse);
 
 router.get("/api/classes", classController.getClasses);
 router.post(
@@ -205,6 +213,9 @@ router.post(
   teacherOnly,
   classController.createClass,
 );
+// Specific routes before /:id
+router.get("/api/classes/course/:courseId", classController.getClassesByCourse);
+router.get("/api/classes/batch/:batchId", classController.getClassesByBatch);
 router.get("/api/classes/:id", classController.getClassById);
 router.put(
   "/api/classes/:id",
@@ -218,8 +229,19 @@ router.delete(
   teacherOnly,
   classController.deleteClass,
 );
-router.get("/api/classes/course/:courseId", classController.getClassesByCourse);
-router.get("/api/classes/batch/:batchId", classController.getClassesByBatch);
+router.post("/api/classes/:id/attendance", authenticate, teacherOnly, classController.markAttendance);
+router.get("/api/classes/:id/attendance", authenticate, teacherOnly, classController.getAttendance);
+
+// Class result routes
+router.get("/api/class-results", authenticate, adminOnly, classResultController.getResults);
+router.post("/api/class-results", authenticate, adminOnly, classResultController.createResult);
+router.put("/api/class-results/upsert", authenticate, teacherOnly, classResultController.upsertResult);
+router.get("/api/class-results/class/:classId", authenticate, teacherOnly, classResultController.getResultsByClass);
+router.get("/api/class-results/batch/:batchId", authenticate, adminOnly, classResultController.getResultsByBatch);
+router.get("/api/class-results/summary/:batchId", authenticate, teacherOnly, classResultController.getBatchSummary);
+router.get("/api/class-results/:id", authenticate, adminOnly, classResultController.getResultById);
+router.put("/api/class-results/:id", authenticate, adminOnly, classResultController.updateResult);
+router.delete("/api/class-results/:id", authenticate, adminOnly, classResultController.deleteResult);
 
 // Enrollment routes
 router.get(
@@ -232,11 +254,7 @@ router.post(
   authenticate,
   enrollmentController.createEnrollment,
 );
-router.get(
-  "/api/enrollments/:id",
-  authenticate,
-  enrollmentController.getEnrollmentById,
-);
+// Specific routes before /:id
 router.get(
   "/api/enrollments/student/:studentId",
   authenticate,
@@ -251,6 +269,16 @@ router.get(
   "/api/enrollments/course/:courseId",
   authenticate,
   enrollmentController.getEnrollmentsByCourse,
+);
+router.get(
+  "/api/enrollments/batch/:batchId",
+  authenticate,
+  enrollmentController.getEnrollmentsByBatch,
+);
+router.get(
+  "/api/enrollments/:id",
+  authenticate,
+  enrollmentController.getEnrollmentById,
 );
 router.put(
   "/api/enrollments/:id",
