@@ -29,13 +29,13 @@ const activityAttemptController = require("./controllers/activityAttemptControll
 const classResultController = require("./controllers/classResultController");
 
 const aiController = require("./controllers/aiController");
-const { uploadVideo, signVideo } = require("./controllers/uploadController");
+const { uploadVideo, proxyStream } = require("./controllers/uploadController");
 
 
 // Routes
 // Upload routes
 router.post("/api/upload/video", authenticate, teacherOnly, ...uploadVideo);
-router.get("/api/stream/video", authenticate, signVideo);
+router.get("/api/stream/video", proxyStream);
 
 // AI routes (math canvas)
 router.post("/api/ai/generate-question", authenticate, aiController.generateQuestion);
