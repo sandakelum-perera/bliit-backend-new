@@ -29,12 +29,18 @@ const activityAttemptController = require("./controllers/activityAttemptControll
 const classResultController = require("./controllers/classResultController");
 
 const aiController = require("./controllers/aiController");
-const { uploadVideo, proxyStream } = require("./controllers/uploadController");
+const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
 
 
 // Routes
-// Upload routes
-router.post("/api/upload/video", authenticate, teacherOnly, ...uploadVideo);
+// Upload routes — multipart (chunk-based, works through nginx size limits)
+router.post("/api/upload/video/multipart/start",    authenticate, teacherOnly, startMultipart);
+router.put("/api/upload/video/multipart/part",       authenticate, teacherOnly, uploadPart);
+router.post("/api/upload/video/multipart/complete",  authenticate, teacherOnly, completeMultipart);
+// Single-request streaming upload (requires nginx client_max_body_size ≥ file size)
+router.put("/api/upload/video", authenticate, teacherOnly, streamUpload);
+router.get("/api/upload/video/presign", authenticate, teacherOnly, presignUpload);
+router.post("/api/upload/video/legacy", authenticate, teacherOnly, ...uploadVideo);
 router.get("/api/stream/video", proxyStream);
 
 // AI routes (math canvas)
