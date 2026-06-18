@@ -29,6 +29,8 @@ const activityAttemptController = require("./controllers/activityAttemptControll
 const classResultController = require("./controllers/classResultController");
 
 const aiController = require("./controllers/aiController");
+const canvasController = require("./controllers/canvasController");
+const { aiCredits } = require("./services/credits");
 const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
 
 
@@ -43,10 +45,29 @@ router.get("/api/upload/video/presign", authenticate, teacherOnly, presignUpload
 router.post("/api/upload/video/legacy", authenticate, teacherOnly, ...uploadVideo);
 router.get("/api/stream/video", proxyStream);
 
-// AI routes (math canvas)
-router.post("/api/ai/generate-question", authenticate, aiController.generateQuestion);
-router.post("/api/ai/solve-math", authenticate, aiController.solveMath);
-router.post("/api/ai/check-answer", authenticate, aiController.checkAnswer);
+// AI routes (math canvas) — metered: 1 credit per successful generation
+router.post("/api/ai/generate-question", authenticate, aiCredits, aiController.generateQuestion);
+router.post("/api/ai/solve-math", authenticate, aiCredits, aiController.solveMath);
+router.post("/api/ai/check-answer", authenticate, aiCredits, aiController.checkAnswer);
+
+// Canvas AI gateway (text / json / vision / image / tts — keys stay server-side)
+router.post("/api/canvas/text", authenticate, aiCredits, canvasController.text);
+router.post("/api/canvas/json", authenticate, aiCredits, canvasController.json);
+router.post("/api/canvas/vision", authenticate, aiCredits, canvasController.vision);
+router.post("/api/canvas/vision-json", authenticate, aiCredits, canvasController.visionJSON);
+router.post("/api/canvas/image", authenticate, aiCredits, canvasController.image);
+router.post("/api/canvas/tts", authenticate, aiCredits, canvasController.tts);
+
+// AI subscription / credits
+router.get("/api/canvas/credits", authenticate, canvasController.credits);
+router.post("/api/canvas/charge", authenticate, canvasController.charge);
+router.post("/api/canvas/plan", authenticate, adminOnly, canvasController.setPlan);
+
+// AI subscription checkout (PayHere)
+router.post("/api/canvas/subscribe", authenticate, canvasController.subscribe);
+router.post("/api/canvas/subscribe/notify", canvasController.subscribeNotify); // PayHere — no auth
+router.post("/api/canvas/subscribe/confirm", authenticate, canvasController.subscribeConfirm);
+router.get("/api/canvas/subscription", authenticate, canvasController.subscription);
 
 // Authentication routes
 router.post("/api/users/login", userController.login);
