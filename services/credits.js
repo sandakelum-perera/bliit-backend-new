@@ -10,9 +10,9 @@
 
 const PLANS = {
   free: { id: "free", name: "Free", price: 0, priceYear: 0, monthly: 30, daily: 5 },
-  pro25: { id: "pro25", name: "Pro", price: 25, priceYear: 250, monthly: 100, daily: null },
-  pro40: { id: "pro40", name: "Premium", price: 40, priceYear: 400, monthly: 200, daily: null },
-  pro100: { id: "pro100", name: "Ultimate", price: 100, priceYear: 1000, monthly: 600, daily: null },
+  pro25: { id: "pro25", name: "Pro", price: 8500, priceYear: 83500, monthly: 100, daily: null },
+  pro40: { id: "pro40", name: "Premium", price: 13500, priceYear: 133500, monthly: 200, daily: null },
+  pro100: { id: "pro100", name: "Ultimate", price: 33500, priceYear: 334000, monthly: 600, daily: null },
 };
 
 const PLAN_LIST = Object.values(PLANS);

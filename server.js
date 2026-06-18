@@ -13,6 +13,7 @@ const corsOptions = {
   origin: [
     "https://www.bliit.lk",
     "https://bliit.lk",
+    "https://canvas.bliit.lk",
     "http://localhost:5173",
     "http://localhost:8081",
     "http://localhost:8080",

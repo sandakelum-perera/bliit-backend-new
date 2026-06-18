@@ -26,7 +26,7 @@ const {
 const PAYHERE_MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || "1227569";
 const PAYHERE_SECRET = process.env.PAYHERE_MERCHANT_SECRET || "your_merchant_secret";
 const PAYHERE_MODE = process.env.PAYHERE_MODE || "sandbox";
-const SUB_CURRENCY = process.env.PAYHERE_SUB_CURRENCY || "USD"; // plans are priced in $
+const SUB_CURRENCY = process.env.PAYHERE_SUB_CURRENCY || "LKR";
 
 function payhereHash(orderId, amount, currency) {
   const hashedSecret = crypto.createHash("md5").update(PAYHERE_SECRET).digest("hex").toUpperCase();
@@ -465,7 +465,7 @@ exports.subscribe = async (req, res) => {
     const orderId = `AISUB_${user._id}_${plan}_${period}_${Date.now()}`;
     const amount = price.toFixed(2);
     const currency = SUB_CURRENCY;
-    const frontend = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontend = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
     const backend = process.env.BACKEND_URL || "http://localhost:3000";
     const [firstName, ...rest] = (user.name || "User").split(" ");
 

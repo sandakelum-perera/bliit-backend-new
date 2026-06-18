@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
   // ── AI subscription / credits ──
   aiPlan: {
     type: String,
-    enum: ["free", "pro25", "pro40"],
+    enum: ["free", "pro25", "pro40", "pro100"],
     default: "free",
   },
   aiPlanExpiresAt: Date, // when a paid plan reverts to free (null for free)
