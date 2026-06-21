@@ -32,9 +32,22 @@ const aiController = require("./controllers/aiController");
 const canvasController = require("./controllers/canvasController");
 const { aiCredits } = require("./services/credits");
 const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
+const proxyController = require("./controllers/proxyController");
+const browserController = require("./controllers/browserController");
 
 
 // Routes
+// Web browser proxy — strips X-Frame-Options so pages can load in the canvas iframe
+router.get("/api/proxy", proxyController.proxyPage);
+
+// Remote headless browser (Puppeteer) — powers the screenshot-based browser mode
+// No auth — whiteboard is already auth-gated at the app level
+router.post("/api/browser/navigate", browserController.navigate);
+router.post("/api/browser/click", browserController.click);
+router.post("/api/browser/scroll", browserController.scroll);
+router.post("/api/browser/type", browserController.type);
+router.post("/api/browser/key", browserController.key);
+router.post("/api/browser/image-at", browserController.imageAt);
 // Upload routes — multipart (chunk-based, works through nginx size limits)
 router.post("/api/upload/video/multipart/start",    authenticate, teacherOnly, startMultipart);
 router.put("/api/upload/video/multipart/part",       authenticate, teacherOnly, uploadPart);
