@@ -498,6 +498,24 @@ router.delete(
   adminOnly,
   adminController.deleteUser,
 );
+router.get(
+  "/api/admin/teachers/pending",
+  authenticate,
+  adminOnly,
+  adminController.getPendingTeachers,
+);
+router.put(
+  "/api/admin/users/:userId/approve",
+  authenticate,
+  adminOnly,
+  adminController.approveTeacher,
+);
+router.delete(
+  "/api/admin/users/:userId/reject",
+  authenticate,
+  adminOnly,
+  adminController.rejectTeacher,
+);
 
 // Pathway routes
 router.get("/api/pathways", pathwayController.getPathways);
