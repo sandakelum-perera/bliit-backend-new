@@ -34,10 +34,8 @@ const { aiCredits } = require("./services/credits");
 const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
 const proxyController = require("./controllers/proxyController");
 const browserController = require("./controllers/browserController");
-<<<<<<< HEAD
 const whiteboardController = require("./controllers/whiteboardController");
-=======
->>>>>>> c0f48fe039b52c0d00aa204d10f59986a3cd018a
+
 
 
 // Routes
@@ -502,6 +500,24 @@ router.delete(
   adminOnly,
   adminController.deleteUser,
 );
+router.get(
+  "/api/admin/teachers/pending",
+  authenticate,
+  adminOnly,
+  adminController.getPendingTeachers,
+);
+router.put(
+  "/api/admin/users/:userId/approve",
+  authenticate,
+  adminOnly,
+  adminController.approveTeacher,
+);
+router.delete(
+  "/api/admin/users/:userId/reject",
+  authenticate,
+  adminOnly,
+  adminController.rejectTeacher,
+);
 
 // Pathway routes
 router.get("/api/pathways", pathwayController.getPathways);
@@ -544,7 +560,7 @@ router.get(
 
 router.use("/api/meetings", require("./meetings"));
 
-// Whiteboard cloud save / load
+// cloud save / load
 router.get("/api/whiteboards", authenticate, whiteboardController.list);
 router.post("/api/whiteboards", authenticate, whiteboardController.create);
 router.get("/api/whiteboards/:id", authenticate, whiteboardController.get);

@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema({
     dayUsed: { type: Number, default: 0 },
     dayKey: { type: String, default: "" }, // "YYYY-MM-DD"
   },
+  is_approved: { type: Boolean, default: true },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });

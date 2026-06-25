@@ -225,6 +225,47 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
+// Get all pending teacher accounts awaiting admin approval
+exports.getPendingTeachers = async (req, res) => {
+  try {
+    const pendingUsers = await User.find({ role: "teacher", is_approved: false });
+    const userIds = pendingUsers.map((u) => u._id);
+    const teachers = await Teacher.find({ user_id: { $in: userIds } }).populate("user_id");
+    res.json(teachers);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Approve a teacher account
+exports.approveTeacher = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { is_approved: true, updated_at: Date.now() },
+      { new: true },
+    );
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ message: "Teacher approved", user });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Reject a teacher account (deletes the user and teacher record)
+exports.rejectTeacher = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByIdAndDelete(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    await Teacher.deleteMany({ user_id: userId });
+    res.json({ message: "Teacher rejected and removed" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Get all students with their enrollment info
 exports.getAllStudentsWithEnrollments = async (req, res) => {
   try {

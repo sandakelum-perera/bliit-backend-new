@@ -152,6 +152,7 @@ exports.register = async (req, res) => {
       password: hashedPassword,
       role: role || "student",
       phone_number,
+      is_approved: role === "teacher" ? false : true,
     });
 
     const newUser = await user.save();
@@ -229,6 +230,7 @@ exports.googleAuth = async (req, res) => {
         profile_image: picture,
         role: role,
         googleId: payload.sub,
+        is_approved: role === "teacher" ? false : true,
       });
       await user.save();
       isNewUser = true;

@@ -2,8 +2,12 @@ const Teacher = require("../models/Teacher");
 
 exports.getTeachers = async (req, res) => {
   try {
-    const teachers = await Teacher.find().populate("user_id");
-    res.json(teachers);
+    const teachers = await Teacher.find().populate({
+      path: "user_id",
+      match: { is_approved: true },
+    });
+    // populate returns null for user_id when the match condition isn't met
+    res.json(teachers.filter((t) => t.user_id !== null));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
