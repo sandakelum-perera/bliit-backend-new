@@ -34,6 +34,8 @@ const { aiCredits } = require("./services/credits");
 const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
 const proxyController = require("./controllers/proxyController");
 const browserController = require("./controllers/browserController");
+const whiteboardController = require("./controllers/whiteboardController");
+
 
 
 // Routes
@@ -557,5 +559,12 @@ router.get(
 );
 
 router.use("/api/meetings", require("./meetings"));
+
+// cloud save / load
+router.get("/api/whiteboards", authenticate, whiteboardController.list);
+router.post("/api/whiteboards", authenticate, whiteboardController.create);
+router.get("/api/whiteboards/:id", authenticate, whiteboardController.get);
+router.put("/api/whiteboards/:id", authenticate, whiteboardController.update);
+router.delete("/api/whiteboards/:id", authenticate, whiteboardController.remove);
 
 module.exports = router;
