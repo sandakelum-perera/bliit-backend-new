@@ -34,7 +34,10 @@ const { aiCredits } = require("./services/credits");
 const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
 const proxyController = require("./controllers/proxyController");
 const browserController = require("./controllers/browserController");
+<<<<<<< HEAD
 const whiteboardController = require("./controllers/whiteboardController");
+=======
+>>>>>>> c0f48fe039b52c0d00aa204d10f59986a3cd018a
 
 
 // Routes
