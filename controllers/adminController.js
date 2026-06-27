@@ -191,15 +191,46 @@ exports.updateUserRole = async (req, res) => {
       return res.status(400).json({ message: "Invalid role" });
     }
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { role, updated_at: Date.now() },
-      { new: true },
-    );
-
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    const oldRole = user.role;
+
+    // Remove old role record when role changes
+    if (oldRole === "student" && role !== "student") {
+      await Student.deleteOne({ user_id: userId });
+    } else if (oldRole === "teacher" && role !== "teacher") {
+      await Teacher.deleteOne({ user_id: userId });
+    }
+
+    // Create new role record if one doesn't already exist
+    if (role === "student" && oldRole !== "student") {
+      const exists = await Student.findOne({ user_id: userId });
+      if (!exists) {
+        await Student.create({
+          user_id: userId,
+          name: user.name,
+          email: user.email,
+          phone_number: user.phone_number,
+        });
+      }
+    } else if (role === "teacher" && oldRole !== "teacher") {
+      const exists = await Teacher.findOne({ user_id: userId });
+      if (!exists) {
+        await Teacher.create({
+          user_id: userId,
+          name: user.name,
+          email: user.email,
+          phone_number: user.phone_number,
+        });
+      }
+    }
+
+    user.role = role;
+    user.updated_at = Date.now();
+    await user.save();
 
     res.json(user);
   } catch (err) {
