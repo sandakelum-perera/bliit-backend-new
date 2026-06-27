@@ -5,6 +5,8 @@ const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
 const CourseContent = require("../models/CourseContent");
 const Batch = require("../models/Batch");
+const Subscription = require("../models/Subscription");
+const { status: creditStatus, PLANS } = require("../services/credits");
 
 // Assign active batch to any enrollments that are missing one
 async function patchMissingBatches() {
@@ -23,11 +25,15 @@ async function patchMissingBatches() {
 // Get all users with pagination and filters
 exports.getAllUsers = async (req, res) => {
   try {
-    const { page = 1, limit = 20, role } = req.query;
+    const { page = 1, limit = 20, role, search } = req.query;
     const query = {};
 
     if (role) {
       query.role = role;
+    }
+    if (search) {
+      const re = new RegExp(search, "i");
+      query.$or = [{ name: re }, { email: re }];
     }
 
     const users = await User.find(query)
@@ -261,6 +267,152 @@ exports.rejectTeacher = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
     await Teacher.deleteMany({ user_id: userId });
     res.json({ message: "Teacher rejected and removed" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Get payment history: paid course enrollments + AI subscriptions
+exports.getPaymentHistory = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, type } = req.query;
+
+    let coursePayments = [];
+    let aiSubscriptions = [];
+
+    if (!type || type === "course") {
+      coursePayments = await Enrollment.find({ payment_status: "paid" })
+        .populate({ path: "student_id", populate: { path: "user_id", select: "name email" } })
+        .populate("course_id", "courseName courseCode courseFee limitedTimeOffer limitedTimeOfferPrice")
+        .populate("batch_id", "batchName batchCode")
+        .sort({ payment_date: -1 })
+        .lean();
+
+      coursePayments = coursePayments.map((e) => {
+        const fee =
+          e.course_id?.limitedTimeOffer && e.course_id?.limitedTimeOfferPrice
+            ? e.course_id.limitedTimeOfferPrice
+            : e.course_id?.courseFee || 0;
+        return {
+          _id: e._id,
+          type: "course",
+          studentName: e.student_id?.user_id?.name || e.student_id?.name || "Unknown",
+          email: e.student_id?.user_id?.email || e.student_id?.email || "",
+          courseName: e.course_id?.courseName || "",
+          courseCode: e.course_id?.courseCode || "",
+          batchName: e.batch_id?.batchName || "",
+          amount: fee,
+          currency: "LKR",
+          date: e.payment_date || e.enrollment_date,
+          status: "paid",
+        };
+      });
+    }
+
+    if (!type || type === "ai") {
+      aiSubscriptions = await Subscription.find({ status: { $in: ["active", "expired", "cancelled"] } })
+        .populate("user_id", "name email")
+        .sort({ startedAt: -1 })
+        .lean();
+
+      aiSubscriptions = aiSubscriptions.map((s) => ({
+        _id: s._id,
+        type: "ai_subscription",
+        studentName: s.user_id?.name || "Unknown",
+        email: s.user_id?.email || "",
+        plan: s.plan,
+        period: s.period,
+        amount: s.amount || 0,
+        currency: s.currency || "LKR",
+        date: s.startedAt || s.created_at,
+        expiresAt: s.expiresAt,
+        status: s.status,
+      }));
+    }
+
+    const all = [...coursePayments, ...aiSubscriptions].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+
+    const total = all.length;
+    const start = (page - 1) * limit;
+    const paginated = all.slice(start, start + Number(limit));
+
+    res.json({
+      payments: paginated,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+      summary: {
+        totalCoursePayments: coursePayments.length,
+        totalAiSubscriptions: aiSubscriptions.length,
+        totalRevenueLKR: [...coursePayments, ...aiSubscriptions]
+          .filter((p) => p.currency === "LKR")
+          .reduce((sum, p) => sum + (p.amount || 0), 0),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Get AI credits overview for all users
+exports.getCreditsOverview = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, plan } = req.query;
+    const query = {};
+    if (plan) query.aiPlan = plan;
+
+    const users = await User.find(query)
+      .select("name email role aiPlan aiPlanExpiresAt aiCredits created_at")
+      .sort({ created_at: -1 })
+      .lean();
+
+    const enriched = users.map((u) => {
+      const planDef = PLANS[u.aiPlan] || PLANS.free;
+      const credits = u.aiCredits || {};
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const monthUsed = credits.monthKey === monthKey ? (credits.monthUsed || 0) : 0;
+      const monthRemaining = Math.max(0, planDef.monthly - monthUsed);
+      const isExpired =
+        u.aiPlan !== "free" && u.aiPlanExpiresAt && new Date(u.aiPlanExpiresAt) < now;
+
+      return {
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        plan: isExpired ? "free" : (u.aiPlan || "free"),
+        planName: isExpired ? "Free" : planDef.name,
+        monthlyLimit: isExpired ? PLANS.free.monthly : planDef.monthly,
+        monthUsed,
+        monthRemaining: isExpired ? Math.max(0, PLANS.free.monthly - monthUsed) : monthRemaining,
+        expiresAt: u.aiPlanExpiresAt || null,
+        isExpired: !!isExpired,
+      };
+    });
+
+    const filtered = plan
+      ? enriched.filter((u) => u.plan === plan)
+      : enriched;
+
+    const total = filtered.length;
+    const start = (page - 1) * limit;
+    const paginated = filtered.slice(start, start + Number(limit));
+
+    const planCounts = Object.keys(PLANS).reduce((acc, p) => {
+      acc[p] = enriched.filter((u) => u.plan === p).length;
+      return acc;
+    }, {});
+
+    res.json({
+      users: paginated,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+      planCounts,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

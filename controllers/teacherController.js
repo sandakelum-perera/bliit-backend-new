@@ -4,7 +4,7 @@ exports.getTeachers = async (req, res) => {
   try {
     const teachers = await Teacher.find().populate({
       path: "user_id",
-      match: { is_approved: true },
+      match: { is_approved: { $ne: false } },
     });
     // populate returns null for user_id when the match condition isn't met
     res.json(teachers.filter((t) => t.user_id !== null));

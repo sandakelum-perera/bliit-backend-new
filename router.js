@@ -518,6 +518,18 @@ router.delete(
   adminOnly,
   adminController.rejectTeacher,
 );
+router.get(
+  "/api/admin/payments",
+  authenticate,
+  adminOnly,
+  adminController.getPaymentHistory,
+);
+router.get(
+  "/api/admin/credits",
+  authenticate,
+  adminOnly,
+  adminController.getCreditsOverview,
+);
 
 // Pathway routes
 router.get("/api/pathways", pathwayController.getPathways);
