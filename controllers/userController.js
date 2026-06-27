@@ -19,8 +19,8 @@ const phoneInvalid = (phone) => !phone || !isValidPhone(phone);
 
 // Return the currently authenticated user (used by math canvas SSO)
 exports.getMe = (req, res) => {
-  const { _id, name, email, profile_image, role } = req.user;
-  res.json({ _id, name, email, profile_image, role });
+  const { _id, name, email, profile_image, role, phone_number } = req.user;
+  res.json({ _id, name, email, profile_image, role, phone_number });
 };
 
 exports.getUsers = async (req, res) => {
