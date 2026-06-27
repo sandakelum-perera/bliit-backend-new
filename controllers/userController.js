@@ -83,7 +83,7 @@ exports.login = async (req, res) => {
 
     res.json({
       token,
-      requiresPhone: user.role === "teacher" && phoneInvalid(user.phone_number),
+      requiresPhone: phoneInvalid(user.phone_number),
       user: {
         _id: user._id,
         name: user.name,
@@ -282,7 +282,7 @@ exports.googleAuth = async (req, res) => {
     res.json({
       token,
       isNewUser,
-      requiresPhone: user.role === "teacher" && phoneInvalid(user.phone_number),
+      requiresPhone: phoneInvalid(user.phone_number),
       user: {
         _id: user._id,
         name: user.name,
