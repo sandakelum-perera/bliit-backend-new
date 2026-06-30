@@ -10,7 +10,7 @@
 
 const PLANS = {
   free: { id: "free", name: "Free", price: 0, priceYear: 0, monthly: 30, daily: 5 },
-  pro25: { id: "pro25", name: "Pro", price: 8500, priceYear: 83500, monthly: 100, daily: null },
+  pro25: { id: "pro25", name: "Pro", price: 1590, priceYear: 15900, monthly: 100, daily: null },
   pro40: { id: "pro40", name: "Premium", price: 13500, priceYear: 133500, monthly: 200, daily: null },
   pro100: { id: "pro100", name: "Ultimate", price: 33500, priceYear: 334000, monthly: 600, daily: null },
 };
