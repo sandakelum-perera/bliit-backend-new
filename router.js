@@ -31,7 +31,7 @@ const classResultController = require("./controllers/classResultController");
 const aiController = require("./controllers/aiController");
 const canvasController = require("./controllers/canvasController");
 const { aiCredits } = require("./services/credits");
-const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
+const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, presignImage, presignImageGet, proxyStream } = require("./controllers/uploadController");
 const proxyController = require("./controllers/proxyController");
 const browserController = require("./controllers/browserController");
 const whiteboardController = require("./controllers/whiteboardController");
@@ -59,6 +59,9 @@ router.put("/api/upload/video", authenticate, teacherOnly, streamUpload);
 router.get("/api/upload/video/presign", authenticate, teacherOnly, presignUpload);
 router.post("/api/upload/video/legacy", authenticate, teacherOnly, ...uploadVideo);
 router.get("/api/stream/video", proxyStream);
+// Whiteboard image upload — any authenticated user (not teacher-only)
+router.get("/api/upload/image/presign", authenticate, presignImage);
+router.post("/api/upload/image/presign-get", authenticate, presignImageGet);
 
 // AI routes (math canvas) — metered: 1 credit per successful generation
 router.post("/api/ai/generate-question", authenticate, aiCredits, aiController.generateQuestion);

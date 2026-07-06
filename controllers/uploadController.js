@@ -24,6 +24,8 @@ const BUCKET        = process.env.AWS_S3_BUCKET;
 const ALLOWED_MIME  = ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"];
 const MAX_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 
+const ALLOWED_IMAGE_MIME = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"];
+
 // ── Streaming upload ───────────────────────────────────────────────────────
 //
 // PUT /api/upload/video?filename=<name>
@@ -216,6 +218,75 @@ const presignUpload = async (req, res) => {
   }
 };
 
+// ── Pre-signed whiteboard image upload ─────────────────────────────────────
+//
+// Whiteboard images used to be embedded as base64 data URLs directly in the
+// shape JSON, which bloated the save payload past the body-size limit (and
+// MongoDB's 16MB document limit) for boards with a few photos. Instead, the
+// client uploads the raw file straight to S3 and stores just the object key;
+// view URLs are presigned on demand since the bucket is private (the IAM
+// user here has no bucket-policy/CORS permissions to make it public-read).
+//
+// GET /api/upload/image/presign?filename=<name>&contentType=<mime>
+//   -> { uploadUrl, getUrl, key }
+
+const presignImage = async (req, res) => {
+  try {
+    const { filename = "image.png", contentType = "image/png" } = req.query;
+
+    if (!ALLOWED_IMAGE_MIME.includes(contentType)) {
+      return res.status(400).json({ message: `Unsupported image type: ${contentType}` });
+    }
+
+    const ext = path.extname(filename) || ".png";
+    const key = `whiteboard-images/${req.user._id}/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+
+    const putCommand = new PutObjectCommand({
+      Bucket:      BUCKET,
+      Key:         key,
+      ContentType: contentType,
+    });
+    const uploadUrl = await getSignedUrl(s3, putCommand, { expiresIn: 3600 });
+
+    const getCommand = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+    const getUrl = await getSignedUrl(s3, getCommand, { expiresIn: 3600 });
+
+    res.json({ uploadUrl, getUrl, key });
+  } catch (err) {
+    console.error("[Presign] Image error:", err.message);
+    res.status(500).json({ message: err.message || "Failed to generate upload URL" });
+  }
+};
+
+// POST /api/upload/image/presign-get  { keys: string[] }  -> { urls: { [key]: url } }
+//
+// Re-signs view URLs for images already uploaded — needed because a board
+// opened hours after the original upload will have expired URLs. Each key is
+// checked to fall under the requesting user's own prefix so users can't read
+// each other's images.
+
+const presignImageGet = async (req, res) => {
+  try {
+    const { keys } = req.body || {};
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return res.status(400).json({ message: "keys array is required" });
+    }
+
+    const prefix = `whiteboard-images/${req.user._id}/`;
+    const urls = {};
+    for (const key of keys) {
+      if (typeof key !== "string" || !key.startsWith(prefix)) continue;
+      const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+      urls[key] = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    }
+
+    res.json({ urls });
+  } catch (err) {
+    console.error("[Presign] Image GET error:", err.message);
+    res.status(500).json({ message: err.message || "Failed to generate view URL" });
+  }
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function keyFromUrl(rawUrl) {
@@ -254,4 +325,4 @@ const proxyStream = async (req, res) => {
   }
 };
 
-module.exports = { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream };
+module.exports = { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, presignImage, presignImageGet, proxyStream };
