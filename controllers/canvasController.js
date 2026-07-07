@@ -330,7 +330,13 @@ exports.image = async (req, res) => {
           /* ignore */
         }
         if (/model|not (found|available)|access|verif|gpt-image/i.test(msg))
-          r = await call({ model: "dall-e-3", prompt, n: 1, size: "1024x1024" });
+          r = await call({
+            model: "dall-e-3",
+            prompt,
+            n: 1,
+            size: "1024x1024",
+            response_format: "b64_json",
+          });
       }
       if (!r.ok) return res.json({ dataUrl: null });
       const data = await r.json();

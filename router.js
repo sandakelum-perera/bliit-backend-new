@@ -25,6 +25,7 @@ const adminController = require("./controllers/adminController");
 
 const pathwayController = require("./controllers/pathwayController");
 const mcqAttemptController      = require("./controllers/mcqAttemptController");
+const aiQuizAttemptController   = require("./controllers/aiQuizAttemptController");
 const activityAttemptController = require("./controllers/activityAttemptController");
 const classResultController = require("./controllers/classResultController");
 
@@ -62,6 +63,19 @@ router.get("/api/stream/video", proxyStream);
 // Whiteboard image upload — any authenticated user (not teacher-only)
 router.get("/api/upload/image/presign", authenticate, presignImage);
 router.post("/api/upload/image/presign-get", authenticate, presignImageGet);
+
+// AI routes (math canvas) — metered: 1 credit per successful generation
+router.post("/api/ai/generate-question", authenticate, aiCredits, aiController.generateQuestion);
+router.post("/api/ai/solve-math", authenticate, aiCredits, aiController.solveMath);
+router.post("/api/ai/check-answer", authenticate, aiCredits, aiController.checkAnswer);
+
+// Canvas AI gateway (text / json / vision / image / tts — keys stay server-side)
+router.post("/api/canvas/text", authenticate, aiCredits, canvasController.text);
+router.post("/api/canvas/json", authenticate, aiCredits, canvasController.json);
+router.post("/api/canvas/vision", authenticate, aiCredits, canvasController.vision);
+router.post("/api/canvas/vision-json", authenticate, aiCredits, canvasController.visionJSON);
+router.post("/api/canvas/image", authenticate, aiCredits, canvasController.image);
+router.post("/api/canvas/tts", authenticate, aiCredits, canvasController.tts);
 
 // AI routes (math canvas) — metered: 1 credit per successful generation
 router.post("/api/ai/generate-question", authenticate, aiCredits, aiController.generateQuestion);
@@ -559,6 +573,10 @@ router.get(
   authenticate,
   mcqAttemptController.getAttemptsByUserAndContent,
 );
+
+// AI note quiz attempt routes (ad-hoc quizzes generated from scanned notes)
+router.post("/api/ai-quiz-attempts", authenticate, aiQuizAttemptController.submitAttempt);
+router.get("/api/ai-quiz-attempts/me", authenticate, aiQuizAttemptController.getMyAttempts);
 
 // Activity Attempt routes
 router.post("/api/activity-attempts", authenticate, activityAttemptController.submitAttempt);
