@@ -32,10 +32,25 @@ const classResultController = require("./controllers/classResultController");
 const aiController = require("./controllers/aiController");
 const canvasController = require("./controllers/canvasController");
 const { aiCredits } = require("./services/credits");
-const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, proxyStream } = require("./controllers/uploadController");
+const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, presignImage, presignImageGet, proxyStream } = require("./controllers/uploadController");
+const proxyController = require("./controllers/proxyController");
+const browserController = require("./controllers/browserController");
+const whiteboardController = require("./controllers/whiteboardController");
+
 
 
 // Routes
+// Web browser proxy — strips X-Frame-Options so pages can load in the canvas iframe
+router.get("/api/proxy", proxyController.proxyPage);
+
+// Remote headless browser (Puppeteer) — powers the screenshot-based browser mode
+// No auth — whiteboard is already auth-gated at the app level
+router.post("/api/browser/navigate", browserController.navigate);
+router.post("/api/browser/click", browserController.click);
+router.post("/api/browser/scroll", browserController.scroll);
+router.post("/api/browser/type", browserController.type);
+router.post("/api/browser/key", browserController.key);
+router.post("/api/browser/image-at", browserController.imageAt);
 // Upload routes — multipart (chunk-based, works through nginx size limits)
 router.post("/api/upload/video/multipart/start",    authenticate, teacherOnly, startMultipart);
 router.put("/api/upload/video/multipart/part",       authenticate, teacherOnly, uploadPart);
@@ -45,6 +60,22 @@ router.put("/api/upload/video", authenticate, teacherOnly, streamUpload);
 router.get("/api/upload/video/presign", authenticate, teacherOnly, presignUpload);
 router.post("/api/upload/video/legacy", authenticate, teacherOnly, ...uploadVideo);
 router.get("/api/stream/video", proxyStream);
+// Whiteboard image upload — any authenticated user (not teacher-only)
+router.get("/api/upload/image/presign", authenticate, presignImage);
+router.post("/api/upload/image/presign-get", authenticate, presignImageGet);
+
+// AI routes (math canvas) — metered: 1 credit per successful generation
+router.post("/api/ai/generate-question", authenticate, aiCredits, aiController.generateQuestion);
+router.post("/api/ai/solve-math", authenticate, aiCredits, aiController.solveMath);
+router.post("/api/ai/check-answer", authenticate, aiCredits, aiController.checkAnswer);
+
+// Canvas AI gateway (text / json / vision / image / tts — keys stay server-side)
+router.post("/api/canvas/text", authenticate, aiCredits, canvasController.text);
+router.post("/api/canvas/json", authenticate, aiCredits, canvasController.json);
+router.post("/api/canvas/vision", authenticate, aiCredits, canvasController.vision);
+router.post("/api/canvas/vision-json", authenticate, aiCredits, canvasController.visionJSON);
+router.post("/api/canvas/image", authenticate, aiCredits, canvasController.image);
+router.post("/api/canvas/tts", authenticate, aiCredits, canvasController.tts);
 
 // AI routes (math canvas) — metered: 1 credit per successful generation
 router.post("/api/ai/generate-question", authenticate, aiCredits, aiController.generateQuestion);
@@ -486,6 +517,36 @@ router.delete(
   adminOnly,
   adminController.deleteUser,
 );
+router.get(
+  "/api/admin/teachers/pending",
+  authenticate,
+  adminOnly,
+  adminController.getPendingTeachers,
+);
+router.put(
+  "/api/admin/users/:userId/approve",
+  authenticate,
+  adminOnly,
+  adminController.approveTeacher,
+);
+router.delete(
+  "/api/admin/users/:userId/reject",
+  authenticate,
+  adminOnly,
+  adminController.rejectTeacher,
+);
+router.get(
+  "/api/admin/payments",
+  authenticate,
+  adminOnly,
+  adminController.getPaymentHistory,
+);
+router.get(
+  "/api/admin/credits",
+  authenticate,
+  adminOnly,
+  adminController.getCreditsOverview,
+);
 
 // Pathway routes
 router.get("/api/pathways", pathwayController.getPathways);
@@ -531,5 +592,12 @@ router.get(
 );
 
 router.use("/api/meetings", require("./meetings"));
+
+// cloud save / load
+router.get("/api/whiteboards", authenticate, whiteboardController.list);
+router.post("/api/whiteboards", authenticate, whiteboardController.create);
+router.get("/api/whiteboards/:id", authenticate, whiteboardController.get);
+router.put("/api/whiteboards/:id", authenticate, whiteboardController.update);
+router.delete("/api/whiteboards/:id", authenticate, whiteboardController.remove);
 
 module.exports = router;

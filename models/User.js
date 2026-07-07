@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
   // ── AI subscription / credits ──
   aiPlan: {
     type: String,
-    enum: ["free", "pro25", "pro40"],
+    enum: ["free", "pro25", "pro40", "pro100"],
     default: "free",
   },
   aiPlanExpiresAt: Date, // when a paid plan reverts to free (null for free)
@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema({
     dayUsed: { type: Number, default: 0 },
     dayKey: { type: String, default: "" }, // "YYYY-MM-DD"
   },
+  is_approved: { type: Boolean, default: true },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });

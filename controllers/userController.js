@@ -19,8 +19,8 @@ const phoneInvalid = (phone) => !phone || !isValidPhone(phone);
 
 // Return the currently authenticated user (used by math canvas SSO)
 exports.getMe = (req, res) => {
-  const { _id, name, email, profile_image, role } = req.user;
-  res.json({ _id, name, email, profile_image, role });
+  const { _id, name, email, profile_image, role, phone_number } = req.user;
+  res.json({ _id, name, email, profile_image, role, phone_number });
 };
 
 exports.getUsers = async (req, res) => {
@@ -152,6 +152,7 @@ exports.register = async (req, res) => {
       password: hashedPassword,
       role: role || "student",
       phone_number,
+      is_approved: role === "teacher" ? false : true,
     });
 
     const newUser = await user.save();
@@ -229,6 +230,7 @@ exports.googleAuth = async (req, res) => {
         profile_image: picture,
         role: role,
         googleId: payload.sub,
+        is_approved: role === "teacher" ? false : true,
       });
       await user.save();
       isNewUser = true;

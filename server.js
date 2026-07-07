@@ -13,6 +13,7 @@ const corsOptions = {
   origin: [
     "https://www.bliit.lk",
     "https://bliit.lk",
+    "https://canvas.bliit.lk",
     "http://localhost:5173",
     "http://localhost:8081",
     "http://localhost:8080",
@@ -25,8 +26,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(express.json({ limit: "500mb" }));
+app.use(express.urlencoded({ limit: "500mb", extended: true }));
 
 console.log("[Server] CORS configured for origins:", corsOptions.origin);
 
@@ -106,7 +107,14 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error("[Server] Error:", err.message);
   console.error("[Server] Stack:", err.stack);
-  res.status(500).json({
+
+  if (err.type === "entity.too.large" || err.status === 413) {
+    return res.status(413).json({
+      message: "Whiteboard is too large to save. Try removing or shrinking some images.",
+    });
+  }
+
+  res.status(err.status || err.statusCode || 500).json({
     message: "Internal server error",
     error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });

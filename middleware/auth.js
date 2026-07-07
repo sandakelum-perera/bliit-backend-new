@@ -1,8 +1,17 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { enforceExpiry } = require("../services/credits");
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
+
+// Reverts an expired paid aiPlan back to free and persists it, so any
+// authenticated request picks up the downgrade — not just AI-canvas routes.
+async function applyExpiry(user) {
+  if (enforceExpiry(user)) {
+    await user.save().catch(() => {});
+  }
+}
 
 // Authentication middleware - verifies user is logged in
 const authenticate = async (req, res, next) => {
@@ -20,6 +29,7 @@ const authenticate = async (req, res, next) => {
       if (!user) {
         return res.status(401).json({ message: "Invalid user" });
       }
+      await applyExpiry(user);
       req.user = user;
       return next();
     }
@@ -37,6 +47,7 @@ const authenticate = async (req, res, next) => {
       if (!user) {
         return res.status(401).json({ message: "Invalid token" });
       }
+      await applyExpiry(user);
       req.user = user;
       return next();
     }
