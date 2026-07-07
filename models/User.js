@@ -19,6 +19,19 @@ const userSchema = new mongoose.Schema({
   google_token: String,
   google_refresh_token: String,
   token: String,
+  // ── AI subscription / credits ──
+  aiPlan: {
+    type: String,
+    enum: ["free", "pro25", "pro40"],
+    default: "free",
+  },
+  aiPlanExpiresAt: Date, // when a paid plan reverts to free (null for free)
+  aiCredits: {
+    monthUsed: { type: Number, default: 0 },
+    monthKey: { type: String, default: "" }, // "YYYY-MM"
+    dayUsed: { type: Number, default: 0 },
+    dayKey: { type: String, default: "" }, // "YYYY-MM-DD"
+  },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
