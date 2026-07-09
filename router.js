@@ -30,6 +30,9 @@ const activityAttemptController = require("./controllers/activityAttemptControll
 const classResultController = require("./controllers/classResultController");
 
 const aiController = require("./controllers/aiController");
+const studyPlanController = require("./controllers/studyPlanController");
+const savedItemController = require("./controllers/savedItemController");
+const practiceController = require("./controllers/practiceController");
 const canvasController = require("./controllers/canvasController");
 const { aiCredits } = require("./services/credits");
 const { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, presignImage, presignImageGet, proxyStream } = require("./controllers/uploadController");
@@ -89,6 +92,29 @@ router.post("/api/canvas/vision", authenticate, aiCredits, canvasController.visi
 router.post("/api/canvas/vision-json", authenticate, aiCredits, canvasController.visionJSON);
 router.post("/api/canvas/image", authenticate, aiCredits, canvasController.image);
 router.post("/api/canvas/tts", authenticate, aiCredits, canvasController.tts);
+
+// Study Plan AI routes — metered: 1 credit per successful generation
+router.post("/api/study-plan/generate", authenticate, aiCredits, studyPlanController.generatePlan);
+router.post("/api/study-plan/part-mcqs", authenticate, aiCredits, studyPlanController.generatePartMcqs);
+router.post("/api/study-plan/final-test", authenticate, aiCredits, studyPlanController.generateFinalTest);
+router.post("/api/study-plan/evaluate", authenticate, aiCredits, studyPlanController.evaluateAnswer);
+router.post("/api/study-plan/more-explanation", authenticate, aiCredits, studyPlanController.generateMoreExplanation);
+router.post("/api/study-plan/more-examples", authenticate, aiCredits, studyPlanController.generateMoreExamples);
+
+// Saved study-plan history (auto-saved on generate / evaluate)
+router.get("/api/study-plan/plans", authenticate, studyPlanController.getMyPlans);
+router.get("/api/study-plan/results", authenticate, studyPlanController.getMyResults);
+
+// Items the student explicitly saved (study plans, mind maps, AI notes).
+// Powers the Notebook tabs and the home "Recent Activity" feed.
+router.post("/api/saved", authenticate, savedItemController.save);
+router.get("/api/saved", authenticate, savedItemController.list);
+router.delete("/api/saved/:id", authenticate, savedItemController.remove);
+
+// Practice Questions — metered: 1 credit per generation. Essays are graded via
+// /api/study-plan/evaluate (reused).
+router.post("/api/practice/mcqs", authenticate, aiCredits, practiceController.generateMcqs);
+router.post("/api/practice/essays", authenticate, aiCredits, practiceController.generateEssays);
 
 // AI subscription / credits
 router.get("/api/canvas/credits", authenticate, canvasController.credits);
