@@ -65,6 +65,16 @@ mongoose
   .connect(mongoUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    // Without these, a connection that goes silently dead (e.g. a firewall
+    // between us and the managed Mongo cluster black-holing traffic to a
+    // specific replica-set member) leaves queries hanging forever instead of
+    // failing — indistinguishable from the server being down until a proxy
+    // in front (Cloudflare) times the request out at 100s+. These bound how
+    // long the driver waits before erroring (and retrying a healthy node).
+    serverSelectionTimeoutMS: 8000,
+    socketTimeoutMS: 15000,
+    connectTimeoutMS: 8000,
+    heartbeatFrequencyMS: 5000,
   })
   .then(async () => {
     console.log("[Server] MongoDB connected successfully");

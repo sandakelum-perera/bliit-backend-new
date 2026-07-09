@@ -218,43 +218,55 @@ const presignUpload = async (req, res) => {
   }
 };
 
-// ── Pre-signed whiteboard image upload ─────────────────────────────────────
+// ── Whiteboard image upload (streamed through the backend) ────────────────
 //
 // Whiteboard images used to be embedded as base64 data URLs directly in the
 // shape JSON, which bloated the save payload past the body-size limit (and
 // MongoDB's 16MB document limit) for boards with a few photos. Instead, the
-// client uploads the raw file straight to S3 and stores just the object key;
-// view URLs are presigned on demand since the bucket is private (the IAM
-// user here has no bucket-policy/CORS permissions to make it public-read).
+// client uploads the raw file here and we pipe it straight to S3.
 //
-// GET /api/upload/image/presign?filename=<name>&contentType=<mime>
-//   -> { uploadUrl, getUrl, key }
+// A direct browser->S3 presigned PUT was tried first, but S3 PUT is not a
+// "simple" CORS request — every upload triggers a preflight OPTIONS, and the
+// bucket has no CORS rule (the IAM user here can't grant itself one). Proxying
+// through our own API sidesteps that: this origin's CORS is already handled
+// by the app-level cors() middleware, and server-to-S3 traffic isn't subject
+// to browser CORS at all. Mirrors the existing video `streamUpload`.
+//
+// PUT /api/upload/image?filename=<name>  ->  { key, url }
 
-const presignImage = async (req, res) => {
+const streamImageUpload = async (req, res) => {
   try {
-    const { filename = "image.png", contentType = "image/png" } = req.query;
+    const filename = req.query.filename || "image.png";
+    const contentType = (req.headers["content-type"] || "image/png").split(";")[0].trim();
 
     if (!ALLOWED_IMAGE_MIME.includes(contentType)) {
       return res.status(400).json({ message: `Unsupported image type: ${contentType}` });
     }
 
+    const contentLength = req.headers["content-length"]
+      ? parseInt(req.headers["content-length"], 10)
+      : undefined;
+
     const ext = path.extname(filename) || ".png";
     const key = `whiteboard-images/${req.user._id}/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
 
-    const putCommand = new PutObjectCommand({
-      Bucket:      BUCKET,
-      Key:         key,
-      ContentType: contentType,
-    });
-    const uploadUrl = await getSignedUrl(s3, putCommand, { expiresIn: 3600 });
+    await s3.send(new PutObjectCommand({
+      Bucket:        BUCKET,
+      Key:           key,
+      Body:          req,
+      ContentType:   contentType,
+      ContentLength: contentLength,
+    }));
 
     const getCommand = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-    const getUrl = await getSignedUrl(s3, getCommand, { expiresIn: 3600 });
+    const url = await getSignedUrl(s3, getCommand, { expiresIn: 3600 });
 
-    res.json({ uploadUrl, getUrl, key });
+    res.json({ key, url });
   } catch (err) {
-    console.error("[Presign] Image error:", err.message);
-    res.status(500).json({ message: err.message || "Failed to generate upload URL" });
+    console.error("[Upload] Image stream error:", err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ message: err.message || "Upload failed" });
+    }
   }
 };
 
@@ -325,4 +337,4 @@ const proxyStream = async (req, res) => {
   }
 };
 
-module.exports = { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, presignImage, presignImageGet, proxyStream };
+module.exports = { streamUpload, startMultipart, uploadPart, completeMultipart, uploadVideo, presignUpload, streamImageUpload, presignImageGet, proxyStream };
