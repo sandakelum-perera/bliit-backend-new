@@ -16,12 +16,23 @@ const savedItemSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["study_plan", "mind_map", "ai_note"],
+    enum: ["study_plan", "mind_map", "ai_note", "note", "notebook"],
     required: true,
+    index: true,
+  },
+  // The notebook this item lives in (null for top-level items). Notes created
+  // inside a notebook point at that notebook's SavedItem _id.
+  parent_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SavedItem",
+    default: null,
     index: true,
   },
   title: { type: String, default: "" },
   subtitle: { type: String, default: "" },
+  // One-line blurb shown under the title in note lists.
+  description: { type: String, default: "" },
+  favorite: { type: Boolean, default: false },
   // Context the item was created for (empty for plain AI notes).
   className: { type: String, default: "" },
   subject: { type: String, default: "" },
@@ -35,5 +46,7 @@ const savedItemSchema = new mongoose.Schema({
 
 // Newest-first listing per user, optionally narrowed by type.
 savedItemSchema.index({ user_id: 1, type: 1, created_at: -1 });
+// Listing the notes inside one notebook.
+savedItemSchema.index({ user_id: 1, parent_id: 1, created_at: -1 });
 
 module.exports = mongoose.model("SavedItem", savedItemSchema);
