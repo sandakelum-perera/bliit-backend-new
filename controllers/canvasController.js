@@ -307,10 +307,16 @@ exports.visionJSON = async (req, res) => {
   }
 };
 
-// POST /api/canvas/image  { prompt, provider }  →  { dataUrl: string | null }
+// POST /api/canvas/image  { prompt, provider, imageBase64?, mimeType? }
+//   →  { dataUrl: string | null }
+//
+// An optional source image (e.g. the student's scanned page) is passed to the
+// model alongside the prompt, so any diagram they drew can be reproduced in the
+// generated note image. Gemini only — OpenAI's generations endpoint takes no
+// image input, so it quietly falls back to prompt-only.
 exports.image = async (req, res) => {
   try {
-    const { prompt, provider } = req.body;
+    const { prompt, provider, imageBase64, mimeType = "image/jpeg" } = req.body;
     if (!prompt || !String(prompt).trim()) return res.status(400).json({ error: "prompt is required" });
 
     if (provider === "openai") {
@@ -347,8 +353,10 @@ exports.image = async (req, res) => {
 
     // Gemini native image model (best-effort — never hard-fails)
     try {
+      const parts = [{ text: prompt }];
+      if (imageBase64) parts.push({ inlineData: { mimeType, data: imageBase64 } });
       const data = await geminiCall(GEMINI_IMAGE_MODEL, {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts }],
         generationConfig: { responseModalities: ["IMAGE"] },
       });
       const part = geminiInlinePart(data);
@@ -509,11 +517,117 @@ exports.subscribe = async (req, res) => {
       address: "",
       city: "Colombo",
       country: "Sri Lanka",
+      // Where the mobile app sends the student to actually pay.
+      checkout_url: `${backend}/api/canvas/pay/${encodeURIComponent(orderId)}`,
     });
   } catch (err) {
     console.error("canvas/subscribe error:", err.message);
     res.status(500).json({ error: "Could not start checkout." });
   }
+};
+
+/* ── Browser hand-off for the mobile app ──────────────────────────────────── */
+
+function esc(v) {
+  return String(v == null ? "" : v).replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
+}
+
+/** Minimal branded page shell. */
+function page(title, body) {
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)}</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#faf8fd;
+color:#2b2437;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+.card{background:#fff;border:1px solid #ece7f4;border-radius:20px;padding:28px;max-width:420px;
+width:100%;text-align:center;box-shadow:0 10px 30px rgba(109,58,198,.08)}
+h1{font-size:20px;margin:0 0 8px}p{font-size:14px;line-height:1.5;color:#6b6478;margin:0}
+.dot{width:38px;height:38px;border-radius:50%;border:3px solid #ece7f4;border-top-color:#6D3AC6;
+margin:0 auto 16px;animation:s .9s linear infinite}@keyframes s{to{transform:rotate(360deg)}}
+</style></head><body><div class="card">${body}</div></body></html>`;
+}
+
+// GET /api/canvas/pay/:orderId  — the mobile app opens this in the phone's
+// browser. PayHere's checkout is a form POST, which an app cannot hand to the
+// browser directly, so this page carries the (server-signed) fields and submits
+// itself. No auth: the order id is the secret, and the signature is ours.
+exports.payPage = async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || "");
+    const [prefix, userId, plan, period] = orderId.split("_");
+    const def = PLANS[plan];
+    if (prefix !== "AISUB" || !def) return res.status(400).send(page("Invalid order", "<h1>Invalid order</h1>"));
+
+    const Subscription = require("../models/Subscription");
+    const sub = await Subscription.findOne({ orderId });
+    if (!sub) return res.status(404).send(page("Order not found", "<h1>Order not found</h1>"));
+    if (sub.status === "active")
+      return res.redirect(`/api/canvas/pay/done?status=success`);
+
+    const User = require("../models/User");
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).send(page("Account not found", "<h1>Account not found</h1>"));
+
+    const amount = parseFloat(sub.amount).toFixed(2);
+    const currency = sub.currency || SUB_CURRENCY;
+    const backend = process.env.BACKEND_URL || "http://localhost:3000";
+    const [firstName, ...rest] = (user.name || "User").split(" ");
+    const action = `https://${PAYHERE_MODE === "sandbox" ? "sandbox." : ""}payhere.lk/pay/checkout`;
+
+    const fields = {
+      merchant_id: PAYHERE_MERCHANT_ID,
+      return_url: `${backend}/api/canvas/pay/done?status=success`,
+      cancel_url: `${backend}/api/canvas/pay/done?status=cancel`,
+      notify_url: `${backend}/api/canvas/subscribe/notify`,
+      order_id: orderId,
+      items: `Bliit ${def.name} plan — ${period === "year" ? "yearly" : "monthly"} (${def.monthly} AI credits/mo)`,
+      currency,
+      amount,
+      hash: payhereHash(orderId, amount, currency),
+      first_name: firstName,
+      last_name: rest.join(" "),
+      email: user.email,
+      phone: user.phone_number || "",
+      address: "",
+      city: "Colombo",
+      country: "Sri Lanka",
+    };
+
+    const inputs = Object.entries(fields)
+      .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`)
+      .join("");
+
+    res.set("Cache-Control", "no-store").send(
+      page(
+        "Redirecting to payment…",
+        `<div class="dot"></div><h1>Taking you to PayHere…</h1>
+         <p>Complete your payment to activate the ${esc(def.name)} plan.</p>
+         <form id="f" method="post" action="${action}">${inputs}</form>
+         <script>document.getElementById('f').submit();</script>`,
+      ),
+    );
+  } catch (err) {
+    console.error("canvas/pay error:", err.message);
+    res.status(500).send(page("Payment error", "<h1>Something went wrong</h1>"));
+  }
+};
+
+// GET /api/canvas/pay/done?status=success|cancel — where PayHere lands the
+// student afterwards. The app activates the plan itself on resume (confirm).
+exports.payDone = (req, res) => {
+  const ok = req.query.status !== "cancel";
+  res.send(
+    page(
+      ok ? "Payment complete" : "Payment cancelled",
+      ok
+        ? `<h1>Payment complete 🎉</h1><p>Your plan is being activated. You can close this tab and return to the Bliit app.</p>`
+        : `<h1>Payment cancelled</h1><p>No charge was made. You can close this tab and return to the Bliit app.</p>`,
+    ),
+  );
 };
 
 // POST /api/canvas/subscribe/notify  (PayHere server-to-server — NO auth)
