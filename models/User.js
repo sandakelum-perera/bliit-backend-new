@@ -11,7 +11,17 @@ const userSchema = new mongoose.Schema({
   },
   phone_number: String,
   email_verified_at: Date,
+  // Either a remote URL (e.g. the Google photo) or a base64 data URI when the
+  // student uploaded and cropped their own picture in the app.
   profile_image: String,
+
+  // ── Student profile, collected by the app's onboarding flow ──
+  gender: { type: String, enum: ["male", "female", ""], default: "" },
+  date_of_birth: Date,
+  // Level id from the app's syllabus options, e.g. "10" or "degree".
+  level: { type: String, default: "" },
+  // Set once the student finishes onboarding, so it is only ever shown once.
+  profile_completed: { type: Boolean, default: false },
   password: String,
   remember_token: String,
   google_id: String,

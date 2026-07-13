@@ -32,6 +32,7 @@ const classResultController = require("./controllers/classResultController");
 const aiController = require("./controllers/aiController");
 const studyPlanController = require("./controllers/studyPlanController");
 const savedItemController = require("./controllers/savedItemController");
+const timetableController = require("./controllers/timetableController");
 const practiceController = require("./controllers/practiceController");
 const canvasController = require("./controllers/canvasController");
 const { aiCredits } = require("./services/credits");
@@ -109,7 +110,14 @@ router.get("/api/study-plan/results", authenticate, studyPlanController.getMyRes
 // Powers the Notebook tabs and the home "Recent Activity" feed.
 router.post("/api/saved", authenticate, savedItemController.save);
 router.get("/api/saved", authenticate, savedItemController.list);
+router.patch("/api/saved/:id", authenticate, savedItemController.update);
 router.delete("/api/saved/:id", authenticate, savedItemController.remove);
+
+// Weekly study timetable (one per student).
+router.get("/api/timetable", authenticate, timetableController.get);
+router.put("/api/timetable", authenticate, timetableController.save);
+router.patch("/api/timetable/complete", authenticate, timetableController.complete);
+router.delete("/api/timetable", authenticate, timetableController.remove);
 
 // Practice Questions — metered: 1 credit per generation. Essays are graded via
 // /api/study-plan/evaluate (reused).
@@ -133,6 +141,10 @@ router.post("/api/users/register", userController.register);
 router.post("/api/users/google-auth", userController.googleAuth);
 router.patch("/api/users/:id/phone", userController.updatePhone);
 router.get("/api/users/me", authenticate, userController.getMe);
+// Onboarding: saves the student's profile and marks it complete.
+router.patch("/api/users/me/profile", authenticate, userController.updateMyProfile);
+// Permanent account deletion (also wipes the user's saved items & timetable).
+router.delete("/api/users/me", authenticate, userController.deleteMe);
 
 // User routes
 router.get("/api/users", authenticate, adminOnly, userController.getUsers);
