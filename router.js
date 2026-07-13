@@ -32,6 +32,8 @@ const classResultController = require("./controllers/classResultController");
 const aiController = require("./controllers/aiController");
 const studyPlanController = require("./controllers/studyPlanController");
 const savedItemController = require("./controllers/savedItemController");
+const noteImageController = require("./controllers/noteImageController");
+const appRatingController = require("./controllers/appRatingController");
 const timetableController = require("./controllers/timetableController");
 const practiceController = require("./controllers/practiceController");
 const canvasController = require("./controllers/canvasController");
@@ -113,6 +115,17 @@ router.get("/api/saved", authenticate, savedItemController.list);
 router.patch("/api/saved/:id", authenticate, savedItemController.update);
 router.delete("/api/saved/:id", authenticate, savedItemController.remove);
 
+// In-app "Rate us": stars + comment, one per student.
+router.post("/api/app-rating", authenticate, appRatingController.submit);
+router.get("/api/app-rating/me", authenticate, appRatingController.mine);
+router.get("/api/app-rating/summary", appRatingController.summary);
+
+// Note images (generated image notes, saved scans) — stored in the notebook S3
+// bucket, so the saved note carries only a key instead of a base64 blob.
+router.post("/api/note-image", authenticate, noteImageController.upload);
+router.get("/api/note-image", authenticate, noteImageController.view);
+router.delete("/api/note-image", authenticate, noteImageController.remove);
+
 // Weekly study timetable (one per student).
 router.get("/api/timetable", authenticate, timetableController.get);
 router.put("/api/timetable", authenticate, timetableController.save);
@@ -134,6 +147,12 @@ router.post("/api/canvas/subscribe", authenticate, canvasController.subscribe);
 router.post("/api/canvas/subscribe/notify", canvasController.subscribeNotify); // PayHere — no auth
 router.post("/api/canvas/subscribe/confirm", authenticate, canvasController.subscribeConfirm);
 router.get("/api/canvas/subscription", authenticate, canvasController.subscription);
+
+// Browser hand-off for the mobile app: PayHere's checkout is a form POST, so the
+// app opens these pages instead of posting itself. Deliberately unauthenticated
+// — they run in the phone's browser, which has no app session.
+router.get("/api/canvas/pay/done", canvasController.payDone);
+router.get("/api/canvas/pay/:orderId", canvasController.payPage);
 
 // Authentication routes
 router.post("/api/users/login", userController.login);

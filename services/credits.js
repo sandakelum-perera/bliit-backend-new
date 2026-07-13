@@ -1,18 +1,23 @@
 /**
  * AI subscription plans + credit metering. Every successful AI generation costs
- * one credit. Plans:
- *   - free   : 5 credits/day, capped at 30/month
- *   - pro25  : $25/mo  → 100 credits/month
- *   - pro40  : $40/mo  → 200 credits/month
- *   - pro100 : $100/mo → 600 credits/month
- * Counters reset automatically at the start of each day/month.
+ * one credit. The plans differ ONLY in how many credits they grant — every
+ * feature is available on every tier — so the credit allowance is the product.
+ *
+ *   - free   : 30 credits/month (5/day)          — free
+ *   - pro25  : 100 credits/month  — LKR   990/mo, LKR  9,900/yr
+ *   - pro40  : 200 credits/month  — LKR 1,890/mo, LKR 18,900/yr
+ *   - pro100 : 600 credits/month  — LKR 4,990/mo, LKR 49,900/yr
+ *
+ * The yearly price is ten months' worth, i.e. two months free. Prices are set
+ * for the Sri Lankan student market. Counters reset at the start of each
+ * day/month.
  */
 
 const PLANS = {
   free: { id: "free", name: "Free", price: 0, priceYear: 0, monthly: 30, daily: 5 },
-  pro25: { id: "pro25", name: "Pro", price: 1590, priceYear: 15900, monthly: 100, daily: null },
-  pro40: { id: "pro40", name: "Premium", price: 13500, priceYear: 133500, monthly: 200, daily: null },
-  pro100: { id: "pro100", name: "Ultimate", price: 33500, priceYear: 334000, monthly: 600, daily: null },
+  pro25: { id: "pro25", name: "Pro", price: 990, priceYear: 9900, monthly: 100, daily: null },
+  pro40: { id: "pro40", name: "Premium", price: 1890, priceYear: 18900, monthly: 200, daily: null },
+  pro100: { id: "pro100", name: "Ultimate", price: 4990, priceYear: 49900, monthly: 600, daily: null },
 };
 
 const PLAN_LIST = Object.values(PLANS);
