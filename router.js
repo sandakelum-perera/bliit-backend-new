@@ -22,6 +22,7 @@ const paymentController = require("./controllers/paymentController");
 const followController = require("./controllers/followController");
 const postController = require("./controllers/postController");
 const adminController = require("./controllers/adminController");
+const webinarRegistrationController = require("./controllers/webinarRegistrationController");
 
 const pathwayController = require("./controllers/pathwayController");
 const mcqAttemptController      = require("./controllers/mcqAttemptController");
@@ -258,6 +259,9 @@ router.delete(
   teacherOnly,
   courseContentController.deleteCourseContent,
 );
+
+router.post("/api/webinar-registrations", webinarRegistrationController.createRegistration);
+router.get("/api/webinar-registrations", authenticate, adminOnly, webinarRegistrationController.getRegistrations);
 
 router.get("/api/reviews", reviewController.getReviews);
 router.post(
