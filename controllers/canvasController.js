@@ -40,6 +40,47 @@ function periodDays(period) {
   return period === "year" ? 365 : 30;
 }
 
+/**
+ * The buyer block PayHere expects on a checkout.
+ *
+ * Every one of these fields must be present and non-empty for a CARD payment.
+ * PayHere accepts the form and only fails later, inside the card flow, with a
+ * generic "Unexpected Error Occurred (PH-0022)" — which is what an empty
+ * address, phone or last name gets you. So each field falls back to a usable
+ * value rather than an empty string.
+ */
+function buyerFields(user) {
+  const parts = String(user.name || "").trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || "Bliit";
+  // PayHere requires a last name; a single-word name would otherwise send "".
+  const lastName = parts.slice(1).join(" ") || "Student";
+
+  // Digits only, and in the local 07XXXXXXXX form PayHere validates against.
+  let phone = String(user.phone_number || "").replace(/\D/g, "");
+  if (phone.startsWith("94")) phone = `0${phone.slice(2)}`;
+  if (!/^0\d{9}$/.test(phone)) phone = "0770000000";
+
+  return {
+    first_name: firstName,
+    last_name: lastName,
+    email: user.email || "student@bliit.lk",
+    phone,
+    address: String(user.address || "").trim() || "No 1, Main Street",
+    city: String(user.city || "").trim() || "Colombo",
+    country: "Sri Lanka",
+  };
+}
+
+/**
+ * PayHere's `items` line is echoed into the card gateway. Non-ASCII characters
+ * (an em dash, say) and over-long strings are a known way to trip it up, so it
+ * is flattened to plain ASCII and clipped.
+ */
+function itemsLabel(planName, period, credits) {
+  const label = `Bliit ${planName} plan - ${period === "year" ? "yearly" : "monthly"} (${credits} AI credits per month)`;
+  return label.replace(/[^\x20-\x7E]/g, "-").slice(0, 100);
+}
+
 /** Activate a paid plan + record/update the matching Subscription history row. */
 async function activateSubscription(user, plan, orderId, amount, currency, period = "month") {
   await activatePlan(user, plan, periodDays(period)); // sets aiPlan, expiry, resets credits
@@ -481,7 +522,6 @@ exports.subscribe = async (req, res) => {
     const currency = SUB_CURRENCY;
     const frontend = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
     const backend = process.env.BACKEND_URL || "http://localhost:3000";
-    const [firstName, ...rest] = (user.name || "User").split(" ");
 
     // Record the pending purchase so it shows in history even before payment.
     try {
@@ -506,17 +546,11 @@ exports.subscribe = async (req, res) => {
       cancel_url: `${frontend}/canvas?subscription=cancel`,
       notify_url: `${backend}/api/canvas/subscribe/notify`,
       order_id: orderId,
-      items: `Smart Canvas ${def.name} plan — ${period === "year" ? "yearly" : "monthly"} (${def.monthly} AI credits/mo)`,
+      items: itemsLabel(def.name, period, def.monthly),
       amount,
       currency,
       hash: payhereHash(orderId, amount, currency),
-      first_name: firstName,
-      last_name: rest.join(" "),
-      email: user.email,
-      phone: user.phone_number || "",
-      address: "",
-      city: "Colombo",
-      country: "Sri Lanka",
+      ...buyerFields(user),
       // Where the mobile app sends the student to actually pay.
       checkout_url: `${backend}/api/canvas/pay/${encodeURIComponent(orderId)}`,
     });
@@ -575,7 +609,6 @@ exports.payPage = async (req, res) => {
     const amount = parseFloat(sub.amount).toFixed(2);
     const currency = sub.currency || SUB_CURRENCY;
     const backend = process.env.BACKEND_URL || "http://localhost:3000";
-    const [firstName, ...rest] = (user.name || "User").split(" ");
     const action = `https://${PAYHERE_MODE === "sandbox" ? "sandbox." : ""}payhere.lk/pay/checkout`;
 
     const fields = {
@@ -584,17 +617,11 @@ exports.payPage = async (req, res) => {
       cancel_url: `${backend}/api/canvas/pay/done?status=cancel`,
       notify_url: `${backend}/api/canvas/subscribe/notify`,
       order_id: orderId,
-      items: `Bliit ${def.name} plan — ${period === "year" ? "yearly" : "monthly"} (${def.monthly} AI credits/mo)`,
+      items: itemsLabel(def.name, period, def.monthly),
       currency,
       amount,
       hash: payhereHash(orderId, amount, currency),
-      first_name: firstName,
-      last_name: rest.join(" "),
-      email: user.email,
-      phone: user.phone_number || "",
-      address: "",
-      city: "Colombo",
-      country: "Sri Lanka",
+      ...buyerFields(user),
     };
 
     const inputs = Object.entries(fields)
