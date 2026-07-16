@@ -22,9 +22,16 @@ const {
   PLANS,
 } = require("../services/credits");
 
-/* ── PayHere config (shared with paymentController) ───────────────────────── */
+/* ── PayHere config ───────────────────────────────────────────────────────── */
+// The mobile app checkout uses its OWN PayHere secret (PAYHERE_MERCHANT_SECRET_APP)
+// so it can have a separate domain/app credential from the web system, which
+// keeps using PAYHERE_MERCHANT_SECRET (see paymentController). Falls back to the
+// shared secret if the app-specific one isn't configured.
 const PAYHERE_MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || "1227569";
-const PAYHERE_SECRET = process.env.PAYHERE_MERCHANT_SECRET || "your_merchant_secret";
+const PAYHERE_SECRET =
+  process.env.PAYHERE_MERCHANT_SECRET_APP ||
+  process.env.PAYHERE_MERCHANT_SECRET ||
+  "your_merchant_secret";
 const PAYHERE_MODE = process.env.PAYHERE_MODE || "sandbox";
 const SUB_CURRENCY = process.env.PAYHERE_SUB_CURRENCY || "LKR";
 
