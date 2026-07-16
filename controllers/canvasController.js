@@ -22,17 +22,19 @@ const {
   PLANS,
 } = require("../services/credits");
 
-/* ── PayHere config ───────────────────────────────────────────────────────── */
-// The mobile app checkout uses its OWN PayHere secret (PAYHERE_MERCHANT_SECRET_APP)
-// so it can have a separate domain/app credential from the web system, which
-// keeps using PAYHERE_MERCHANT_SECRET (see paymentController). Falls back to the
-// shared secret if the app-specific one isn't configured.
-const PAYHERE_MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || "1227569";
+/* ── PayHere config (mobile app checkout) ─────────────────────────────────── */
+// The app checkout has its OWN full PayHere config (merchant id, secret, mode)
+// via the *_APP env vars, each falling back to the shared value. This lets the
+// app run in sandbox for testing while the web system (paymentController) stays
+// live — set PAYHERE_MERCHANT_ID_APP / PAYHERE_MERCHANT_SECRET_APP /
+// PAYHERE_MODE_APP to the sandbox values and leave the shared ones live.
+const PAYHERE_MERCHANT_ID =
+  process.env.PAYHERE_MERCHANT_ID_APP || process.env.PAYHERE_MERCHANT_ID || "1227569";
 const PAYHERE_SECRET =
   process.env.PAYHERE_MERCHANT_SECRET_APP ||
   process.env.PAYHERE_MERCHANT_SECRET ||
   "your_merchant_secret";
-const PAYHERE_MODE = process.env.PAYHERE_MODE || "sandbox";
+const PAYHERE_MODE = process.env.PAYHERE_MODE_APP || process.env.PAYHERE_MODE || "sandbox";
 const SUB_CURRENCY = process.env.PAYHERE_SUB_CURRENCY || "LKR";
 
 function payhereHash(orderId, amount, currency) {
