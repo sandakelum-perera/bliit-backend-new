@@ -560,8 +560,13 @@ exports.subscribe = async (req, res) => {
       currency,
       hash: payhereHash(orderId, amount, currency),
       ...buyerFields(user),
-      // Where the mobile app sends the student to actually pay.
-      checkout_url: `${backend}/api/canvas/pay/${encodeURIComponent(orderId)}`,
+      // Where the mobile app sends the student to actually pay. Served from
+      // the frontend (bliit.lk) — not api.bliit.lk — because PayHere's live
+      // card-domain whitelist matches domains exactly and doesn't cover
+      // subdomains, and bliit.lk is the domain already whitelisted for the
+      // web checkout. The page fetches the signed fields from
+      // GET /api/canvas/pay/:orderId/fields and submits the form itself.
+      checkout_url: `${frontend}/canvas/pay/${encodeURIComponent(orderId)}`,
     });
   } catch (err) {
     console.error("canvas/subscribe error:", err.message);
@@ -594,45 +599,61 @@ margin:0 auto 16px;animation:s .9s linear infinite}@keyframes s{to{transform:rot
 </style></head><body><div class="card">${body}</div></body></html>`;
 }
 
-// GET /api/canvas/pay/:orderId  — the mobile app opens this in the phone's
-// browser. PayHere's checkout is a form POST, which an app cannot hand to the
-// browser directly, so this page carries the (server-signed) fields and submits
-// itself. No auth: the order id is the secret, and the signature is ours.
+/**
+ * Resolves an AISUB order id into the signed PayHere checkout fields, or an
+ * error to show the buyer. Shared by the legacy HTML hand-off page and the
+ * JSON endpoint the frontend (bliit.lk) page uses to submit the form itself —
+ * see resolveCheckout's callers for why the JSON route exists at all: PayHere
+ * whitelists card-payment domains exactly, no subdomains, and api.bliit.lk
+ * isn't (and can't be, alongside bliit.lk) on that list.
+ */
+async function resolveCheckout(orderId) {
+  const [prefix, userId, plan, period] = orderId.split("_");
+  const def = PLANS[plan];
+  if (prefix !== "AISUB" || !def) return { status: 400, error: "Invalid order" };
+
+  const Subscription = require("../models/Subscription");
+  const sub = await Subscription.findOne({ orderId });
+  if (!sub) return { status: 404, error: "Order not found" };
+  if (sub.status === "active") return { alreadyActive: true };
+
+  const User = require("../models/User");
+  const user = await User.findById(userId);
+  if (!user) return { status: 404, error: "Account not found" };
+
+  const amount = parseFloat(sub.amount).toFixed(2);
+  const currency = sub.currency || SUB_CURRENCY;
+  const backend = process.env.BACKEND_URL || "http://localhost:3000";
+  const action = `https://${PAYHERE_MODE === "sandbox" ? "sandbox." : ""}payhere.lk/pay/checkout`;
+
+  const fields = {
+    merchant_id: PAYHERE_MERCHANT_ID,
+    return_url: `${backend}/api/canvas/pay/done?status=success`,
+    cancel_url: `${backend}/api/canvas/pay/done?status=cancel`,
+    notify_url: `${backend}/api/canvas/subscribe/notify`,
+    order_id: orderId,
+    items: itemsLabel(def.name, period, def.monthly),
+    currency,
+    amount,
+    hash: payhereHash(orderId, amount, currency),
+    ...buyerFields(user),
+  };
+
+  return { def, action, fields };
+}
+
+// GET /api/canvas/pay/:orderId  — legacy HTML hand-off page. Still served
+// from api.bliit.lk, so PayHere's live card-domain whitelist rejects it with
+// PH-0022 on card select; kept only as a fallback for the plain redirect.
+// No auth: the order id is the secret, and the signature is ours.
 exports.payPage = async (req, res) => {
   try {
     const orderId = String(req.params.orderId || "");
-    const [prefix, userId, plan, period] = orderId.split("_");
-    const def = PLANS[plan];
-    if (prefix !== "AISUB" || !def) return res.status(400).send(page("Invalid order", "<h1>Invalid order</h1>"));
+    const result = await resolveCheckout(orderId);
+    if (result.error) return res.status(result.status).send(page(result.error, `<h1>${esc(result.error)}</h1>`));
+    if (result.alreadyActive) return res.redirect(`/api/canvas/pay/done?status=success`);
 
-    const Subscription = require("../models/Subscription");
-    const sub = await Subscription.findOne({ orderId });
-    if (!sub) return res.status(404).send(page("Order not found", "<h1>Order not found</h1>"));
-    if (sub.status === "active")
-      return res.redirect(`/api/canvas/pay/done?status=success`);
-
-    const User = require("../models/User");
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).send(page("Account not found", "<h1>Account not found</h1>"));
-
-    const amount = parseFloat(sub.amount).toFixed(2);
-    const currency = sub.currency || SUB_CURRENCY;
-    const backend = process.env.BACKEND_URL || "http://localhost:3000";
-    const action = `https://${PAYHERE_MODE === "sandbox" ? "sandbox." : ""}payhere.lk/pay/checkout`;
-
-    const fields = {
-      merchant_id: PAYHERE_MERCHANT_ID,
-      return_url: `${backend}/api/canvas/pay/done?status=success`,
-      cancel_url: `${backend}/api/canvas/pay/done?status=cancel`,
-      notify_url: `${backend}/api/canvas/subscribe/notify`,
-      order_id: orderId,
-      items: itemsLabel(def.name, period, def.monthly),
-      currency,
-      amount,
-      hash: payhereHash(orderId, amount, currency),
-      ...buyerFields(user),
-    };
-
+    const { def, action, fields } = result;
     const inputs = Object.entries(fields)
       .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`)
       .join("");
@@ -649,6 +670,31 @@ exports.payPage = async (req, res) => {
   } catch (err) {
     console.error("canvas/pay error:", err.message);
     res.status(500).send(page("Payment error", "<h1>Something went wrong</h1>"));
+  }
+};
+
+// GET /api/canvas/pay/:orderId/fields — JSON version of the above, called
+// from a bliit.lk frontend page which drives PayHere's JS SDK
+// (window.payhere.startPayment) instead of posting a raw form — a plain
+// form-post redirect to /pay/checkout still hits PH-0022 on card select even
+// from a whitelisted domain, same as the course-purchase checkout on
+// CourseDetail.tsx, which only works via the SDK. No auth: the order id is
+// the secret, and the signature is ours.
+exports.payFields = async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || "");
+    const result = await resolveCheckout(orderId);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    if (result.alreadyActive) return res.json({ alreadyActive: true });
+
+    res.set("Cache-Control", "no-store").json({
+      planName: result.def.name,
+      sandbox: PAYHERE_MODE === "sandbox",
+      fields: result.fields,
+    });
+  } catch (err) {
+    console.error("canvas/pay/fields error:", err.message);
+    res.status(500).json({ error: "Something went wrong" });
   }
 };
 

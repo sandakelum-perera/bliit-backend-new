@@ -154,6 +154,7 @@ router.get("/api/canvas/subscription", authenticate, canvasController.subscripti
 // app opens these pages instead of posting itself. Deliberately unauthenticated
 // — they run in the phone's browser, which has no app session.
 router.get("/api/canvas/pay/done", canvasController.payDone);
+router.get("/api/canvas/pay/:orderId/fields", canvasController.payFields);
 router.get("/api/canvas/pay/:orderId", canvasController.payPage);
 
 // Authentication routes
