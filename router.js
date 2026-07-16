@@ -27,6 +27,7 @@ const webinarRegistrationController = require("./controllers/webinarRegistration
 const pathwayController = require("./controllers/pathwayController");
 const mcqAttemptController      = require("./controllers/mcqAttemptController");
 const aiQuizAttemptController   = require("./controllers/aiQuizAttemptController");
+const examAttemptController     = require("./controllers/examAttemptController");
 const activityAttemptController = require("./controllers/activityAttemptController");
 const classResultController = require("./controllers/classResultController");
 
@@ -638,6 +639,10 @@ router.get(
 // AI note quiz attempt routes (ad-hoc quizzes generated from scanned notes)
 router.post("/api/ai-quiz-attempts", authenticate, aiQuizAttemptController.submitAttempt);
 router.get("/api/ai-quiz-attempts/me", authenticate, aiQuizAttemptController.getMyAttempts);
+
+// Practice Exam attempts (full Grade 5 / O/L / A/L papers) + their AI analysis.
+router.post("/api/exam-attempts", authenticate, examAttemptController.submit);
+router.get("/api/exam-attempts/me", authenticate, examAttemptController.getMine);
 
 // Activity Attempt routes
 router.post("/api/activity-attempts", authenticate, activityAttemptController.submitAttempt);

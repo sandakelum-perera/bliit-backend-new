@@ -6,6 +6,9 @@
 
 const s3 = require("../services/notebookS3");
 
+/** The app compresses before uploading; this is the backstop. */
+const MAX_BYTES = 1024 * 1024; // 1 MB
+
 // POST /api/note-image  { imageBase64, mimeType? }  →  { key, url }
 exports.upload = async (req, res) => {
   try {
@@ -26,6 +29,9 @@ exports.upload = async (req, res) => {
 
     const buffer = Buffer.from(payload, "base64");
     if (!buffer.length) return res.status(400).json({ error: "That image could not be decoded." });
+    if (buffer.length > MAX_BYTES) {
+      return res.status(413).json({ error: "That image is over 1 MB. Please compress it first." });
+    }
 
     const key = await s3.putNoteImage(req.user._id, buffer, mimeType);
     const url = await s3.signedGetUrl(key);
