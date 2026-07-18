@@ -19,6 +19,7 @@ const {
   activate: activatePlan,
   consume: consumeCredits,
   costOf,
+  planById,
   PLANS,
 } = require("../services/credits");
 
@@ -499,7 +500,7 @@ exports.charge = async (req, res) => {
 exports.setPlan = async (req, res) => {
   try {
     const { plan, userId } = req.body;
-    if (!PLANS[plan]) return res.status(400).json({ error: "Unknown plan." });
+    if (!planById(plan)) return res.status(400).json({ error: "Unknown plan." });
     const User = require("../models/User");
     const target = userId ? await User.findById(userId) : req.user;
     if (!target) return res.status(404).json({ error: "User not found." });
@@ -519,7 +520,7 @@ exports.subscribe = async (req, res) => {
   try {
     const { plan } = req.body;
     const period = req.body.period === "year" ? "year" : "month";
-    const def = PLANS[plan];
+    const def = planById(plan);
     if (!def) return res.status(400).json({ error: "Unknown plan." });
     const price = period === "year" ? def.priceYear : def.price;
     if (!price || price <= 0)
@@ -609,7 +610,7 @@ margin:0 auto 16px;animation:s .9s linear infinite}@keyframes s{to{transform:rot
  */
 async function resolveCheckout(orderId) {
   const [prefix, userId, plan, period] = orderId.split("_");
-  const def = PLANS[plan];
+  const def = planById(plan);
   if (prefix !== "AISUB" || !def) return { status: 400, error: "Invalid order" };
 
   const Subscription = require("../models/Subscription");
@@ -741,7 +742,7 @@ exports.subscribeNotify = async (req, res) => {
     }
 
     const [prefix, userId, plan, period] = String(order_id).split("_");
-    if (prefix !== "AISUB" || !PLANS[plan]) return res.status(400).send("Bad order id");
+    if (prefix !== "AISUB" || !planById(plan)) return res.status(400).send("Bad order id");
 
     const User = require("../models/User");
     const user = await User.findById(userId);
@@ -763,13 +764,14 @@ exports.subscribeConfirm = async (req, res) => {
   try {
     const { order_id } = req.body;
     const [prefix, userId, plan, period] = String(order_id || "").split("_");
-    if (prefix !== "AISUB" || !PLANS[plan])
+    if (prefix !== "AISUB" || !planById(plan))
       return res.status(400).json({ error: "Invalid order id." });
     if (String(userId) !== String(req.user._id))
       return res.status(403).json({ error: "This order belongs to another account." });
 
     if (PAYHERE_MODE === "sandbox") {
-      const price = period === "year" ? PLANS[plan].priceYear : PLANS[plan].price;
+      const def = planById(plan);
+      const price = period === "year" ? def.priceYear : def.price;
       await activateSubscription(req.user, plan, order_id, price, SUB_CURRENCY, period);
       return res.json({ ok: true, status: creditStatus(req.user) });
     }

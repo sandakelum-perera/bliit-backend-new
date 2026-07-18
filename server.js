@@ -84,6 +84,9 @@ mongoose
     } catch (_) {
       // Already dropped or never existed — safe to ignore
     }
+    // Load (and first-run seed) the subscription plans into memory: credit
+    // metering and PayHere checkout both read them synchronously.
+    await require("./services/planStore").init();
   })
   .catch((err) => {
     console.error("[Server] MongoDB connection error:", err.message);

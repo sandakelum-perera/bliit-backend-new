@@ -34,6 +34,7 @@ const classResultController = require("./controllers/classResultController");
 const aiController = require("./controllers/aiController");
 const studyPlanController = require("./controllers/studyPlanController");
 const savedItemController = require("./controllers/savedItemController");
+const planController = require("./controllers/planController");
 const noteImageController = require("./controllers/noteImageController");
 const appRatingController = require("./controllers/appRatingController");
 const timetableController = require("./controllers/timetableController");
@@ -121,6 +122,11 @@ router.delete("/api/saved/:id", authenticate, savedItemController.remove);
 router.post("/api/app-rating", authenticate, appRatingController.submit);
 router.get("/api/app-rating/me", authenticate, appRatingController.mine);
 router.get("/api/app-rating/summary", appRatingController.summary);
+
+// Subscription plans, per product (canvas | notebook). Public: the paywall
+// needs prices, and they aren't secret.
+router.get("/api/plans", planController.list);
+router.post("/api/plans/reload", authenticate, adminOnly, planController.reload);
 
 // Note images (generated image notes, saved scans) — stored in the notebook S3
 // bucket, so the saved note carries only a key instead of a base64 blob.

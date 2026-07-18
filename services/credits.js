@@ -53,8 +53,31 @@ function periodKeys(now = new Date()) {
   return { monthKey: `${y}-${m}`, dayKey: `${y}-${m}-${d}` };
 }
 
+/**
+ * The plan a user is on.
+ *
+ * The Plan collection is the source of truth (see services/planStore); the
+ * hard-coded PLANS below are the fallback used before the cache has loaded, or
+ * if a plan id isn't in the DB. The notebook product is what this app's users
+ * are metered against.
+ */
 function planOf(user) {
-  return PLANS[user?.aiPlan] || PLANS.free;
+  const id = user?.aiPlan || "free";
+  // Required lazily: planStore -> models/Plan -> mongoose, and credits.js is
+  // imported early by the router.
+  const planStore = require("./planStore");
+  return (
+    planStore.get(planStore.NOTEBOOK, id) ||
+    PLANS[id] ||
+    planStore.get(planStore.NOTEBOOK, "free") ||
+    PLANS.free
+  );
+}
+
+/** A known plan id (DB first, then the built-in fallbacks). */
+function planById(id) {
+  const planStore = require("./planStore");
+  return planStore.get(planStore.NOTEBOOK, id) || PLANS[id] || null;
 }
 
 /** Lazily revert an expired paid plan back to Free. Returns whether it changed. */
@@ -119,7 +142,7 @@ function status(user) {
 
 /** Switch a user to a plan, set its expiry, and grant a fresh allowance. */
 async function activate(user, plan, days = 30) {
-  if (!PLANS[plan]) throw new Error("Unknown plan: " + plan);
+  if (!planById(plan)) throw new Error("Unknown plan: " + plan);
   user.aiPlan = plan;
   user.aiPlanExpiresAt = plan === "free" ? null : new Date(Date.now() + days * 86400000);
   ensurePeriods(user); // stamp current day/month keys
@@ -193,6 +216,7 @@ module.exports = {
   COSTS,
   costOf,
   planOf,
+  planById,
   status,
   consume,
   activate,
