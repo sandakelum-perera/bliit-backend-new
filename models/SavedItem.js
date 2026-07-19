@@ -16,7 +16,7 @@ const savedItemSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["study_plan", "mind_map", "ai_note", "note", "notebook"],
+    enum: ["study_plan", "mind_map", "ai_note", "note", "notebook", "flash_cards"],
     required: true,
     index: true,
   },
