@@ -7,7 +7,7 @@
 const mongoose = require("mongoose");
 const SavedItem = require("../models/SavedItem");
 
-const TYPES = ["study_plan", "mind_map", "ai_note", "note", "notebook"];
+const TYPES = ["study_plan", "mind_map", "ai_note", "note", "notebook", "flash_cards"];
 
 const str = (v) => (v == null ? "" : String(v).trim());
 
