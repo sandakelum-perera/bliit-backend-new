@@ -23,6 +23,8 @@ const followController = require("./controllers/followController");
 const postController = require("./controllers/postController");
 const adminController = require("./controllers/adminController");
 const webinarRegistrationController = require("./controllers/webinarRegistrationController");
+const bloomingCentreRegistrationController = require("./controllers/bloomingCentreRegistrationController");
+const bloomingSessionRequestController = require("./controllers/bloomingSessionRequestController");
 
 const pathwayController = require("./controllers/pathwayController");
 const mcqAttemptController      = require("./controllers/mcqAttemptController");
@@ -290,6 +292,15 @@ router.delete(
 router.post("/api/webinar-registrations", webinarRegistrationController.createRegistration);
 router.get("/api/webinar-registrations", authenticate, adminOnly, webinarRegistrationController.getRegistrations);
 
+router.post("/api/blooming-centre-registrations", bloomingCentreRegistrationController.createRegistration);
+router.get("/api/blooming-centre-registrations", authenticate, adminOnly, bloomingCentreRegistrationController.getRegistrations);
+router.get("/api/blooming-centre-registrations/me", authenticate, bloomingCentreRegistrationController.getMyRegistrations);
+router.patch("/api/blooming-centre-registrations/:id/link-user", authenticate, bloomingCentreRegistrationController.linkUser);
+
+router.post("/api/blooming-session-requests", authenticate, bloomingSessionRequestController.createRequest);
+router.get("/api/blooming-session-requests/me", authenticate, bloomingSessionRequestController.getMyRequests);
+router.get("/api/blooming-session-requests", authenticate, adminOnly, bloomingSessionRequestController.getAllRequests);
+
 router.get("/api/reviews", reviewController.getReviews);
 router.post(
   "/api/reviews",
@@ -468,6 +479,11 @@ router.get(
   "/api/payments/details/:courseId/:userId",
   authenticate,
   paymentController.getPaymentDetails,
+);
+router.get(
+  "/api/payments/blooming-centre/:registrationId",
+  authenticate,
+  paymentController.getBloomingCentrePaymentDetails,
 );
 router.post(
   "/api/payments/enrollment/pending",

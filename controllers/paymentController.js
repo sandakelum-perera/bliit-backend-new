@@ -3,6 +3,9 @@ const Enrollment = require("../models/Enrollment");
 const Course = require("../models/Course");
 const Student = require("../models/Student");
 const Batch = require("../models/Batch");
+const BloomingCentreRegistration = require("../models/BloomingCentreRegistration");
+
+const BLOOMING_CENTRE_FEE = 10000; // LKR per semester
 
 // PayHere merchant credentials (replace with your actual credentials)
 const MERCHANT_ID = process.env.PAYHERE_MERCHANT_ID || "1227569";
@@ -106,8 +109,17 @@ exports.verifyPayment = async (req, res) => {
 
     if (localHash === md5sig && status_code === "2") {
       // Payment successful - extract enrollment info from order_id
-      // Format: ENROLL_{userId}_{courseId}_{timestamp}
+      // Format: ENROLL_{userId}_{courseId}_{timestamp} or BLOOM_{registrationId}_{timestamp}
       const [prefix, userId, courseId, timestamp] = order_id.split("_");
+
+      if (prefix === "BLOOM") {
+        const registrationId = userId; // second segment holds the registration id for BLOOM orders
+        await BloomingCentreRegistration.findByIdAndUpdate(registrationId, {
+          payment_status: "paid",
+          payment_date: new Date(),
+        });
+        return res.status(200).send("Payment verified");
+      }
 
       if (prefix === "ENROLL") {
         console.log(
@@ -284,6 +296,45 @@ exports.getPaymentDetails = async (req, res) => {
   }
 };
 
+// Get payment details for a Blooming Centre semester registration
+exports.getBloomingCentrePaymentDetails = async (req, res) => {
+  try {
+    const { registrationId } = req.params;
+
+    const registration = await BloomingCentreRegistration.findById(registrationId);
+    if (!registration) {
+      return res.status(404).json({ message: "Registration not found" });
+    }
+
+    if (registration.payment_status === "paid") {
+      return res.status(400).json({ message: "This registration has already been paid for" });
+    }
+
+    const paymentDetails = {
+      merchant_id: MERCHANT_ID,
+      return_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/blooming-centre?payment=success`,
+      cancel_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/blooming-centre?payment=cancel`,
+      notify_url: `${process.env.BACKEND_URL || "http://localhost:3000"}/api/payments/verify`,
+      order_id: `BLOOM_${registration._id}_${Date.now()}`,
+      items: "BLIIT Blooming Centre - Semester Support",
+      currency: "LKR",
+      amount: BLOOMING_CENTRE_FEE,
+      first_name: registration.name?.split(" ")[0] || "Student",
+      last_name: registration.name?.split(" ").slice(1).join(" ") || "",
+      email: registration.email,
+      phone: registration.phone || "",
+      address: "",
+      city: "Colombo",
+      country: "Sri Lanka",
+      sandbox: PAYHERE_MODE === "sandbox",
+    };
+
+    res.json(paymentDetails);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Manual payment confirmation (for testing or fallback)
 exports.confirmPayment = async (req, res) => {
   try {
@@ -293,8 +344,23 @@ exports.confirmPayment = async (req, res) => {
     console.log("Order ID:", order_id);
 
     // Extract enrollment info from order_id
-    // Format: ENROLL_{userId}_{courseId}_{timestamp}
+    // Format: ENROLL_{userId}_{courseId}_{timestamp} or BLOOM_{registrationId}_{timestamp}
     const [prefix, userId, courseId, timestamp] = order_id.split("_");
+
+    if (prefix === "BLOOM") {
+      const registrationId = userId; // second segment holds the registration id for BLOOM orders
+      const registration = await BloomingCentreRegistration.findById(registrationId);
+      if (!registration) {
+        return res.status(404).json({ message: "Registration not found" });
+      }
+      if (registration.payment_status === "paid") {
+        return res.status(200).json({ message: "Already confirmed", registration, alreadyPaid: true });
+      }
+      registration.payment_status = "paid";
+      registration.payment_date = new Date();
+      await registration.save();
+      return res.status(200).json({ message: "Payment confirmed", registration, alreadyPaid: false });
+    }
 
     if (prefix !== "ENROLL") {
       return res.status(400).json({ message: "Invalid order ID format" });
